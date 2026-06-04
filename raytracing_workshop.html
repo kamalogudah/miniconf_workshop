@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ray Tracing in a Weekend — Go Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0d12;
+  --bg-elev: #11151c;
+  --bg-card: #161b24;
+  --ink: #e6ecf2;
+  --ink-dim: #8a96a8;
+  --ink-faint: #4a5366;
+  --line: #1f2733;
+  --accent: #ff7a3d;       /* sunset orange — the gradient sky */
+  --accent-2: #4ea1ff;     /* sky blue */
+  --accent-3: #b8e1ff;     /* horizon white-blue */
+  --warn: #ffd166;
+  --good: #7dd3a8;
+  --bad: #ff5d6c;
+  --display: 'Fraunces', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --body: 'Inter', -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--body);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.65;
+  font-size: 16px;
+  background-image:
+    radial-gradient(circle at 80% -10%, rgba(255,122,61,0.08), transparent 50%),
+    radial-gradient(circle at 10% 100%, rgba(78,161,255,0.06), transparent 50%);
+  background-attachment: fixed;
+}
+::selection { background: var(--accent); color: var(--bg); }
+
+/* Layout */
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+@media (max-width: 720px) { .wrap { padding: 0 20px; } }
+
+/* Hero */
+.hero {
+  padding: 120px 0 80px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--accent-2) 100%);
+  opacity: 0.04;
+  pointer-events: none;
+}
+.kicker {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kicker::before {
+  content: '';
+  width: 40px;
+  height: 1px;
+  background: var(--accent);
+}
+.hero h1 {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(48px, 8vw, 96px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+}
+.hero h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+.hero .lede {
+  font-family: var(--display);
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink-dim);
+  max-width: 720px;
+  line-height: 1.4;
+  margin-bottom: 40px;
+}
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 24px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.meta-grid > div h4 {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.meta-grid > div p {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* TOC */
+.toc {
+  padding: 60px 0;
+  border-bottom: 1px solid var(--line);
+}
+.toc h2 {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 32px;
+  font-weight: 500;
+}
+.toc ol { list-style: none; counter-reset: m; }
+.toc ol li {
+  counter-increment: m;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  gap: 24px;
+  align-items: baseline;
+  transition: padding-left 0.3s ease;
+}
+.toc ol li:hover { padding-left: 12px; }
+.toc ol li::before {
+  content: counter(m, decimal-leading-zero);
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.toc ol li a {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.toc ol li:hover a { color: var(--accent); }
+.toc ol li .duration {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+
+/* Module */
+.module {
+  padding: 100px 0 60px;
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: 20px;
+}
+.module-head {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
+  margin-bottom: 48px;
+  align-items: start;
+}
+.module-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  font-weight: 700;
+  padding-top: 14px;
+  border-top: 2px solid var(--accent);
+}
+.module h2 {
+  font-family: var(--display);
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.module .subtitle {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--ink-dim);
+  margin-bottom: 8px;
+}
+.module .meta-line {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+
+/* Body */
+.module h3 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 28px;
+  margin: 56px 0 20px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.module h4 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin: 32px 0 12px;
+}
+.module p { margin-bottom: 18px; max-width: 72ch; color: var(--ink); }
+.module p strong { color: #fff; font-weight: 600; }
+.module ul, .module ol { margin: 0 0 22px 24px; max-width: 70ch; }
+.module li { margin-bottom: 8px; }
+
+/* Code */
+pre {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 22px 26px;
+  margin: 24px 0;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.65;
+  position: relative;
+}
+pre::before {
+  content: attr(data-file);
+  position: absolute;
+  top: 8px; right: 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  color: var(--accent-3);
+  background: rgba(78,161,255,0.08);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+pre code { background: none; padding: 0; color: var(--ink); font-size: 13px; }
+
+/* Syntax highlighting (manual classes) */
+.kw { color: #ff7a3d; }       /* keyword */
+.ty { color: #b8e1ff; }       /* type */
+.fn { color: #ffd166; }       /* function */
+.st { color: #7dd3a8; }       /* string */
+.nm { color: #d4a4ff; }       /* number */
+.cm { color: #4a5366; font-style: italic; } /* comment */
+.op { color: #8a96a8; }       /* operator/paren */
+
+/* Callouts */
+.call {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-2);
+  background: rgba(78,161,255,0.04);
+  padding: 18px 22px;
+  margin: 24px 0;
+  border-radius: 4px;
+}
+.call.warn { border-left-color: var(--warn); background: rgba(255,209,102,0.04); }
+.call.idea { border-left-color: var(--good); background: rgba(125,211,168,0.04); }
+.call .label {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--accent-2);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+.call.warn .label { color: var(--warn); }
+.call.idea .label { color: var(--good); }
+.call p:last-child { margin-bottom: 0; }
+
+/* Math block */
+.math {
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 18px;
+  text-align: center;
+  padding: 16px;
+  margin: 18px 0;
+  color: var(--accent-3);
+  background: var(--bg-elev);
+  border-radius: 4px;
+}
+
+/* Run command */
+.run {
+  background: #000;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 18px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--good);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.run::before {
+  content: '$';
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Render preview — SVG illustrations of expected output */
+.render-preview {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  margin: 28px 0;
+  padding: 24px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.render-preview .img-wrap {
+  width: 240px;
+  border: 1px solid var(--line);
+  display: block;
+}
+.render-preview .img-wrap svg { display: block; width: 100%; height: auto; }
+.render-preview .caption .label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: block;
+}
+.render-preview .caption h5 {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.render-preview .caption p {
+  font-size: 14px;
+  color: var(--ink-dim);
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .render-preview { grid-template-columns: 1fr; }
+  .render-preview .img-wrap { width: 100%; max-width: 280px; }
+}
+
+/* Checklist */
+.checklist {
+  list-style: none;
+  margin-left: 0 !important;
+}
+.checklist li {
+  padding: 10px 0 10px 36px;
+  position: relative;
+  border-bottom: 1px dashed var(--line);
+}
+.checklist li::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 14px;
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 3px;
+}
+.checklist li:hover::before { border-color: var(--accent); }
+
+/* Section divider — abstract ray illustration */
+.divider {
+  display: block;
+  margin: 80px auto;
+  width: 100%;
+  max-width: 320px;
+}
+
+/* Footer */
+footer {
+  padding: 80px 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+}
+footer a { color: var(--accent); text-decoration: none; }
+
+/* Print */
+@media print {
+  body { background: white; color: black; }
+  .module { page-break-before: always; }
+  pre { font-size: 10px; }
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+  font-size: 14px;
+}
+th, td {
+  text-align: left;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+td { color: var(--ink); }
+td:first-child { font-family: var(--mono); color: var(--accent); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- ============= HERO ============= -->
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">A weekend workshop · Nairobi, 2026</div>
+    <h1>Ray Tracing<br><em>in Go</em></h1>
+    <p class="lede">Build a path tracer from scratch over one weekend — no external libraries, no graphics API, just math, vectors, and a lot of randomly bouncing photons.</p>
+
+    <div class="meta-grid">
+      <div>
+        <h4>Language</h4>
+        <p>Go 1.21+</p>
+      </div>
+      <div>
+        <h4>Output</h4>
+        <p>PPM image format</p>
+      </div>
+      <div>
+        <h4>Duration</h4>
+        <p>~14 hours · 2 days</p>
+      </div>
+      <div>
+        <h4>Prerequisite</h4>
+        <p>Basic Go syntax</p>
+      </div>
+      <div>
+        <h4>Adapted from</h4>
+        <p>Shirley · Black · Hollasch</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= TOC ============= -->
+<section class="toc">
+  <div class="wrap">
+    <h2>// schedule</h2>
+    <ol>
+      <li><a href="#m0">Setup &amp; the PPM Image</a><span class="duration">45 min</span></li>
+      <li><a href="#m1">The Vec3 Toolkit</a><span class="duration">45 min</span></li>
+      <li><a href="#m2">Rays &amp; the Sky Background</a><span class="duration">60 min</span></li>
+      <li><a href="#m3">Hit Your First Sphere</a><span class="duration">75 min</span></li>
+      <li><a href="#m4">Surface Normals &amp; Hittables</a><span class="duration">90 min</span></li>
+      <li><a href="#m5">A Camera, an Interval, and Antialiasing</a><span class="duration">90 min</span></li>
+      <li><a href="#m6">Diffuse Materials &amp; Bouncing Light</a><span class="duration">90 min</span></li>
+      <li><a href="#m7">Metal &amp; Reflective Surfaces</a><span class="duration">75 min</span></li>
+      <li><a href="#m8">Dielectrics — Glass That Refracts</a><span class="duration">75 min</span></li>
+      <li><a href="#m9">A Positionable Camera</a><span class="duration">45 min</span></li>
+      <li><a href="#m10">Defocus Blur (Depth of Field)</a><span class="duration">45 min</span></li>
+      <li><a href="#m11">The Final Render</a><span class="duration">60 min + render time</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============= M0: Setup ============= -->
+<section class="module" id="m0">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">01</div>
+      <div>
+        <h2>Setup &amp; the PPM Image</h2>
+        <p class="subtitle">Hello, world — but in pixels.</p>
+        <div class="meta-line">Goal · Write a 256×256 RGB image to disk and view it.</div>
+      </div>
+    </div>
+
+    <h3>Why ray tracing in Go?</h3>
+    <p>Ray tracing is one of the most beautiful pieces of code you'll ever write. The whole program fits in a few hundred lines, has zero dependencies, and produces pictures that look almost photographic. The <strong>original book</strong> uses C++. We're using Go because it's the language many of you already work with, the syntax is friendly, and Go's standard library gives us everything we need — files, math, randomness — out of the box.</p>
+
+    <p>Here's the mental model: a <strong>ray tracer</strong> simulates how light travels. For every pixel on the screen, we shoot an imaginary ray from the camera into the scene and ask, <em>"what colour does this ray see?"</em> If it hits a sphere, we figure out the colour at that point. If it hits the sky, we use a sky colour. That's the whole game.</p>
+
+    <h3>Project setup</h3>
+    <p>Create a new Go module. We'll keep everything in a single package <code>main</code> for simplicity — adding folder structure later only distracts from the math.</p>
+
+    <pre data-file="terminal"><code><span class="cm"># Create the project</span>
+mkdir raytracer && cd raytracer
+go mod init raytracer
+
+<span class="cm"># Folder structure we'll build</span>
+raytracer/
+├── go.mod
+├── main.go
+├── vec3.go
+├── ray.go
+├── hittable.go
+├── sphere.go
+├── camera.go
+└── material.go</code></pre>
+
+    <div class="call idea">
+      <div class="label">Workshop tip</div>
+      <p>Don't copy-paste blindly. Type the code in. The mistakes you make while typing teach you more than the lines that work the first time. Peter Shirley says this in the original book and he's right.</p>
+    </div>
+
+    <h3>The PPM format — pixels in plain text</h3>
+    <p>Before we render anything fancy, we need to <strong>output</strong> an image. The simplest format on Earth is PPM: a plain-text file where the first three lines describe the image, and every line after that is just three numbers — red, green, blue, each between 0 and 255.</p>
+
+    <pre data-file="image.ppm"><code><span class="kw">P3</span>          <span class="cm"># magic number — "this is a plain-text PPM"</span>
+<span class="nm">256 256</span>     <span class="cm"># width and height in pixels</span>
+<span class="nm">255</span>         <span class="cm"># max colour value</span>
+<span class="nm">0 0 0</span>       <span class="cm"># pixel (0,0): pure black</span>
+<span class="nm">1 0 0</span>       <span class="cm"># pixel (1,0): tiniest bit of red</span>
+<span class="nm">2 0 0</span>
+<span class="cm">... and so on, left-to-right, top-to-bottom</span></code></pre>
+
+    <p>That's it. Most image viewers on Linux and Mac can open PPM directly. On Windows, install <strong>IrfanView</strong> or use the online viewer <code>ppmviewer.com</code>. We'll write the file to standard output and redirect with <code>&gt;</code>.</p>
+
+    <h3>Code: your first image</h3>
+    <p>This program produces a gradient — red increases left-to-right, green increases top-to-bottom. The bottom-right corner will be yellow (red + green = yellow in additive light).</p>
+
+    <pre data-file="main.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> (
+    <span class="st">"fmt"</span>
+    <span class="st">"os"</span>
+)
+
+<span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="cm">// Image dimensions</span>
+    <span class="kw">const</span> imageWidth, imageHeight = <span class="nm">256</span>, <span class="nm">256</span>
+
+    <span class="cm">// PPM header</span>
+    fmt.<span class="fn">Printf</span>(<span class="st">"P3\n%d %d\n255\n"</span>, imageWidth, imageHeight)
+
+    <span class="cm">// Render — top to bottom, left to right</span>
+    <span class="kw">for</span> j := <span class="nm">0</span>; j &lt; imageHeight; j++ {
+        fmt.<span class="fn">Fprintf</span>(os.Stderr, <span class="st">"\rScanlines remaining: %d "</span>, imageHeight-j)
+        <span class="kw">for</span> i := <span class="nm">0</span>; i &lt; imageWidth; i++ {
+            r := <span class="ty">float64</span>(i) / <span class="ty">float64</span>(imageWidth-<span class="nm">1</span>)
+            g := <span class="ty">float64</span>(j) / <span class="ty">float64</span>(imageHeight-<span class="nm">1</span>)
+            b := <span class="nm">0.0</span>
+
+            ir := <span class="ty">int</span>(<span class="nm">255.999</span> * r)
+            ig := <span class="ty">int</span>(<span class="nm">255.999</span> * g)
+            ib := <span class="ty">int</span>(<span class="nm">255.999</span> * b)
+
+            fmt.<span class="fn">Printf</span>(<span class="st">"%d %d %d\n"</span>, ir, ig, ib)
+        }
+    }
+    fmt.<span class="fn">Fprintln</span>(os.Stderr, <span class="st">"\nDone."</span>)
+}</code></pre>
+
+    <h4>Plain-English walkthrough</h4>
+    <ul>
+      <li><strong>The two loops</strong> — outer loop walks down the rows (j), inner loop walks across the columns (i). That's how PPM expects pixels: row by row, left to right.</li>
+      <li><strong>Why <code>os.Stderr</code> for the progress?</strong> Because we're writing the image to <em>stdout</em>. If the progress text also went to stdout, it would corrupt the file. <code>Stderr</code> shows up in the terminal but doesn't go into the redirected file.</li>
+      <li><strong>The <code>255.999</code> trick</strong> — multiplying by 255.999 instead of 255 ensures that when r is exactly 1.0 we get 255, not 256. Casting to <code>int</code> truncates.</li>
+    </ul>
+
+    <div class="run">go run . &gt; image.ppm</div>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#000000"/>
+              <stop offset="100%" stop-color="#ffff00"/>
+            </linearGradient>
+            <linearGradient id="g1r" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#000000"/>
+              <stop offset="100%" stop-color="#ff0000"/>
+            </linearGradient>
+            <linearGradient id="g1g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#00ff00"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="url(#g1r)"/>
+          <rect width="100" height="100" fill="url(#g1g)" style="mix-blend-mode:screen"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>The graphics "Hello World"</h5>
+        <p>Red increases →, green increases ↓. Bottom-right corner: yellow.</p>
+      </div>
+    </div>
+
+    <div class="call warn">
+      <div class="label">Common gotcha</div>
+      <p>If your viewer says "invalid PPM file," your shell may have written it as UTF-16. Use <code>go run . &gt; image.ppm</code> in <em>bash</em> or <em>zsh</em>, not PowerShell. On Windows, run inside Git Bash or WSL.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M1: Vec3 ============= -->
+<section class="module" id="m1">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">02</div>
+      <div>
+        <h2>The Vec3 Toolkit</h2>
+        <p class="subtitle">One struct to rule positions, directions, and colours.</p>
+        <div class="meta-line">Goal · Build the math primitive every other file will depend on.</div>
+      </div>
+    </div>
+
+    <h3>Why one struct for three things?</h3>
+    <p>In 3D graphics, you constantly work with three different things that all happen to be triples of numbers:</p>
+    <ul>
+      <li>A <strong>point</strong> in 3D space — like (0, 0, -1)</li>
+      <li>A <strong>direction</strong> — like "look toward negative Z"</li>
+      <li>A <strong>colour</strong> — like (red=1.0, green=0.5, blue=0.0)</li>
+    </ul>
+    <p>The original book uses one C++ class <code>vec3</code> for all three. We'll do the same in Go with a <code>Vec3</code> struct. Yes, you could make separate types — and you'd get type safety — but you'd also write three times as many helper functions. We're optimizing for short code that you can keep in your head.</p>
+
+    <h3>The struct &amp; basic operations</h3>
+    <p>Go doesn't have operator overloading, so where C++ writes <code>a + b</code> we write <code>a.Add(b)</code>. Slightly more typing, but unambiguous. Add this file to your project:</p>
+
+    <pre data-file="vec3.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> <span class="st">"math"</span>
+
+<span class="cm">// Vec3 is a 3D vector. We use it for points, directions, AND colours.</span>
+<span class="kw">type</span> Vec3 <span class="kw">struct</span> {
+    X, Y, Z <span class="ty">float64</span>
+}
+
+<span class="cm">// Aliases — no real type safety, but they help readability.</span>
+<span class="kw">type</span> Point3 = Vec3
+<span class="kw">type</span> Color  = Vec3
+
+<span class="cm">// Constructor</span>
+<span class="kw">func</span> <span class="fn">NewVec3</span>(x, y, z <span class="ty">float64</span>) Vec3 { <span class="kw">return</span> Vec3{x, y, z} }
+
+<span class="cm">// --- arithmetic ---</span>
+<span class="kw">func</span> (v Vec3) <span class="fn">Add</span>(u Vec3) Vec3 { <span class="kw">return</span> Vec3{v.X + u.X, v.Y + u.Y, v.Z + u.Z} }
+<span class="kw">func</span> (v Vec3) <span class="fn">Sub</span>(u Vec3) Vec3 { <span class="kw">return</span> Vec3{v.X - u.X, v.Y - u.Y, v.Z - u.Z} }
+<span class="kw">func</span> (v Vec3) <span class="fn">Mul</span>(u Vec3) Vec3 { <span class="kw">return</span> Vec3{v.X * u.X, v.Y * u.Y, v.Z * u.Z} }
+<span class="kw">func</span> (v Vec3) <span class="fn">Scale</span>(t <span class="ty">float64</span>) Vec3 { <span class="kw">return</span> Vec3{v.X * t, v.Y * t, v.Z * t} }
+<span class="kw">func</span> (v Vec3) <span class="fn">Div</span>(t <span class="ty">float64</span>) Vec3   { <span class="kw">return</span> v.<span class="fn">Scale</span>(<span class="nm">1</span> / t) }
+<span class="kw">func</span> (v Vec3) <span class="fn">Neg</span>() Vec3            { <span class="kw">return</span> Vec3{-v.X, -v.Y, -v.Z} }
+
+<span class="cm">// --- length / dot / cross ---</span>
+<span class="kw">func</span> (v Vec3) <span class="fn">LengthSquared</span>() <span class="ty">float64</span> { <span class="kw">return</span> v.X*v.X + v.Y*v.Y + v.Z*v.Z }
+<span class="kw">func</span> (v Vec3) <span class="fn">Length</span>() <span class="ty">float64</span>        { <span class="kw">return</span> math.<span class="fn">Sqrt</span>(v.<span class="fn">LengthSquared</span>()) }
+
+<span class="kw">func</span> <span class="fn">Dot</span>(a, b Vec3) <span class="ty">float64</span> {
+    <span class="kw">return</span> a.X*b.X + a.Y*b.Y + a.Z*b.Z
+}
+
+<span class="kw">func</span> <span class="fn">Cross</span>(a, b Vec3) Vec3 {
+    <span class="kw">return</span> Vec3{
+        a.Y*b.Z - a.Z*b.Y,
+        a.Z*b.X - a.X*b.Z,
+        a.X*b.Y - a.Y*b.X,
+    }
+}
+
+<span class="kw">func</span> (v Vec3) <span class="fn">Unit</span>() Vec3 { <span class="kw">return</span> v.<span class="fn">Div</span>(v.<span class="fn">Length</span>()) }</code></pre>
+
+    <h4>What does each thing actually mean?</h4>
+    <ul>
+      <li><strong>Dot product</strong> — a single number that tells you whether two vectors point the same way (positive), opposite ways (negative), or are perpendicular (zero). We'll use it constantly to figure out whether a ray is hitting the front or back of a surface.</li>
+      <li><strong>Cross product</strong> — gives you a third vector perpendicular to both inputs. Critical for building cameras later.</li>
+      <li><strong>Length</strong> — the distance from the origin to the tip of the vector, by Pythagoras: √(x² + y² + z²).</li>
+      <li><strong>Unit vector</strong> — same direction as the original, but length exactly 1. Like "compass bearing without distance."</li>
+    </ul>
+
+    <h3>Colour helper</h3>
+    <p>Move the "convert (r,g,b) ∈ [0,1] to bytes ∈ [0,255]" logic into its own helper. We'll extend it later to handle multiple samples and gamma correction.</p>
+
+    <pre data-file="vec3.go (continued)"><code><span class="cm">// WriteColor outputs a single pixel's colour in PPM byte format.</span>
+<span class="kw">func</span> (c Color) <span class="fn">WriteColor</span>(w io.Writer) {
+    ir := <span class="ty">int</span>(<span class="nm">255.999</span> * c.X)
+    ig := <span class="ty">int</span>(<span class="nm">255.999</span> * c.Y)
+    ib := <span class="ty">int</span>(<span class="nm">255.999</span> * c.Z)
+    fmt.<span class="fn">Fprintf</span>(w, <span class="st">"%d %d %d\n"</span>, ir, ig, ib)
+}</code></pre>
+
+    <p>Don't forget to <code>import "io"</code> and <code>"fmt"</code> at the top of <code>vec3.go</code>.</p>
+
+    <h3>Refactor main.go to use Vec3</h3>
+    <pre data-file="main.go"><code><span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="kw">const</span> imageWidth, imageHeight = <span class="nm">256</span>, <span class="nm">256</span>
+    fmt.<span class="fn">Printf</span>(<span class="st">"P3\n%d %d\n255\n"</span>, imageWidth, imageHeight)
+    <span class="kw">for</span> j := <span class="nm">0</span>; j &lt; imageHeight; j++ {
+        fmt.<span class="fn">Fprintf</span>(os.Stderr, <span class="st">"\rScanlines remaining: %d "</span>, imageHeight-j)
+        <span class="kw">for</span> i := <span class="nm">0</span>; i &lt; imageWidth; i++ {
+            pixel := <span class="fn">NewVec3</span>(
+                <span class="ty">float64</span>(i)/<span class="ty">float64</span>(imageWidth-<span class="nm">1</span>),
+                <span class="ty">float64</span>(j)/<span class="ty">float64</span>(imageHeight-<span class="nm">1</span>),
+                <span class="nm">0</span>,
+            )
+            pixel.<span class="fn">WriteColor</span>(os.Stdout)
+        }
+    }
+    fmt.<span class="fn">Fprintln</span>(os.Stderr, <span class="st">"\nDone."</span>)
+}</code></pre>
+
+    <div class="run">go run . &gt; image.ppm</div>
+    <p>Same gradient as before, but now we have the toolkit for everything that follows.</p>
+  </div>
+</section>
+
+<!-- ============= M2: Rays & background ============= -->
+<section class="module" id="m2">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">03</div>
+      <div>
+        <h2>Rays &amp; the Sky Background</h2>
+        <p class="subtitle">Send a ray through every pixel. Paint the sky.</p>
+        <div class="meta-line">Goal · A blue-to-white gradient that comes from the geometry, not from a formula on (i, j).</div>
+      </div>
+    </div>
+
+    <h3>What is a ray, mathematically?</h3>
+    <p>A ray is just a half-line: an origin point plus a direction. We parametrise it with a number <code>t</code>:</p>
+    <p class="math">P(t) = A + t · b</p>
+    <p>Plug in <code>t = 0</code>, you're at the origin <strong>A</strong>. Plug in <code>t = 1</code>, you're one step along direction <strong>b</strong>. Bigger <code>t</code> → further along the ray. That's all.</p>
+
+    <pre data-file="ray.go"><code><span class="kw">package</span> main
+
+<span class="kw">type</span> Ray <span class="kw">struct</span> {
+    Origin    Point3
+    Direction Vec3
+}
+
+<span class="kw">func</span> (r Ray) <span class="fn">At</span>(t <span class="ty">float64</span>) Point3 {
+    <span class="kw">return</span> r.Origin.<span class="fn">Add</span>(r.Direction.<span class="fn">Scale</span>(t))
+}</code></pre>
+
+    <h3>The viewport — a window into the scene</h3>
+    <p>Imagine a virtual rectangle floating in front of the camera. Every pixel of our image corresponds to a tiny square on that rectangle. We shoot a ray from the camera (the "eye") through the centre of each pixel-square and into the world. Whatever colour the ray "sees" becomes the pixel's colour.</p>
+
+    <p>The book uses a 16:9 aspect ratio and a viewport height of 2.0 units (in arbitrary "world space"). Our coordinate system:</p>
+    <ul>
+      <li><strong>+X</strong> goes right</li>
+      <li><strong>+Y</strong> goes up</li>
+      <li><strong>−Z</strong> goes <em>into</em> the screen (we look toward −Z)</li>
+    </ul>
+
+    <div class="call">
+      <div class="label">Pixels vs. world</div>
+      <p>Pixel coordinates have Y going <em>down</em> (top-left is (0,0)). World coordinates have Y going <em>up</em>. We bridge the two with a "viewport_v" vector that points downward in world space — that's why it'll have a negative Y component.</p>
+    </div>
+
+    <h3>The sky — a linear blend</h3>
+    <p>For now, every ray we shoot will miss everything (no objects exist yet) and hit the "sky." We compute the sky colour from the ray's direction: rays pointing up are blue, rays pointing forward/down are white. This is just a <strong>lerp</strong> (linear interpolation):</p>
+    <p class="math">colour = (1 − a) · white + a · blue</p>
+    <p>where <code>a</code> goes from 0 at the bottom to 1 at the top.</p>
+
+    <h3>Code: the camera setup &amp; sky render</h3>
+    <pre data-file="main.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> (
+    <span class="st">"fmt"</span>
+    <span class="st">"os"</span>
+)
+
+<span class="kw">func</span> <span class="fn">rayColor</span>(r Ray) Color {
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)        <span class="cm">// remap Y from [-1,1] to [0,1]</span>
+    white := <span class="fn">NewVec3</span>(<span class="nm">1.0</span>, <span class="nm">1.0</span>, <span class="nm">1.0</span>)
+    blue  := <span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>)
+    <span class="kw">return</span> white.<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).<span class="fn">Add</span>(blue.<span class="fn">Scale</span>(a))
+}
+
+<span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="cm">// Image</span>
+    <span class="kw">const</span> aspectRatio = <span class="nm">16.0</span> / <span class="nm">9.0</span>
+    imageWidth  := <span class="nm">400</span>
+    imageHeight := <span class="ty">int</span>(<span class="ty">float64</span>(imageWidth) / aspectRatio)
+    <span class="kw">if</span> imageHeight &lt; <span class="nm">1</span> { imageHeight = <span class="nm">1</span> }
+
+    <span class="cm">// Camera</span>
+    focalLength    := <span class="nm">1.0</span>
+    viewportHeight := <span class="nm">2.0</span>
+    viewportWidth  := viewportHeight * <span class="ty">float64</span>(imageWidth) / <span class="ty">float64</span>(imageHeight)
+    cameraCenter   := <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+
+    <span class="cm">// Vectors across the viewport edges</span>
+    viewportU := <span class="fn">NewVec3</span>(viewportWidth, <span class="nm">0</span>, <span class="nm">0</span>)
+    viewportV := <span class="fn">NewVec3</span>(<span class="nm">0</span>, -viewportHeight, <span class="nm">0</span>) <span class="cm">// negative — Y is flipped</span>
+
+    <span class="cm">// Per-pixel deltas</span>
+    pixelDeltaU := viewportU.<span class="fn">Div</span>(<span class="ty">float64</span>(imageWidth))
+    pixelDeltaV := viewportV.<span class="fn">Div</span>(<span class="ty">float64</span>(imageHeight))
+
+    <span class="cm">// Top-left pixel location</span>
+    viewportUL := cameraCenter.
+        <span class="fn">Sub</span>(<span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, focalLength)).
+        <span class="fn">Sub</span>(viewportU.<span class="fn">Div</span>(<span class="nm">2</span>)).
+        <span class="fn">Sub</span>(viewportV.<span class="fn">Div</span>(<span class="nm">2</span>))
+    pixel00 := viewportUL.<span class="fn">Add</span>(pixelDeltaU.<span class="fn">Add</span>(pixelDeltaV).<span class="fn">Scale</span>(<span class="nm">0.5</span>))
+
+    <span class="cm">// Render</span>
+    fmt.<span class="fn">Printf</span>(<span class="st">"P3\n%d %d\n255\n"</span>, imageWidth, imageHeight)
+    <span class="kw">for</span> j := <span class="nm">0</span>; j &lt; imageHeight; j++ {
+        fmt.<span class="fn">Fprintf</span>(os.Stderr, <span class="st">"\rScanlines remaining: %d "</span>, imageHeight-j)
+        <span class="kw">for</span> i := <span class="nm">0</span>; i &lt; imageWidth; i++ {
+            pixelCenter := pixel00.
+                <span class="fn">Add</span>(pixelDeltaU.<span class="fn">Scale</span>(<span class="ty">float64</span>(i))).
+                <span class="fn">Add</span>(pixelDeltaV.<span class="fn">Scale</span>(<span class="ty">float64</span>(j)))
+            rayDir := pixelCenter.<span class="fn">Sub</span>(cameraCenter)
+            r := Ray{Origin: cameraCenter, Direction: rayDir}
+
+            <span class="fn">rayColor</span>(r).<span class="fn">WriteColor</span>(os.Stdout)
+        }
+    }
+    fmt.<span class="fn">Fprintln</span>(os.Stderr, <span class="st">"\nDone."</span>)
+}</code></pre>
+
+    <h4>What's happening, in one paragraph</h4>
+    <p>For every pixel <code>(i, j)</code>, we compute its position in <em>world space</em> by starting at <code>pixel00</code> (the centre of the top-left pixel) and stepping <code>i</code> times right and <code>j</code> times down. We then shoot a ray from the camera at <code>(0,0,0)</code> through that point. Since there are no objects yet, every ray "hits the sky" — and we colour it based on how steeply it points up.</p>
+
+    <div class="run">go run . &gt; sky.ppm</div>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky)"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>The blue-white sky</h5>
+        <p>Top: blue-ish (0.5, 0.7, 1.0). Bottom: pure white. Aspect ratio 16:9.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M3: First sphere ============= -->
+<section class="module" id="m3">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">04</div>
+      <div>
+        <h2>Hit Your First Sphere</h2>
+        <p class="subtitle">A red dot in the sky. From algebra, no less.</p>
+        <div class="meta-line">Goal · Solve a quadratic equation per pixel and paint pixels that hit a sphere red.</div>
+      </div>
+    </div>
+
+    <h3>Why spheres?</h3>
+    <p>Because the math for "does this ray hit this sphere?" is very simple compared to other shapes. A sphere of radius <em>r</em> centred at point <strong>C</strong> is the set of points <strong>P</strong> where:</p>
+    <p class="math">(C − P) · (C − P) = r²</p>
+    <p>That dot product is just the squared distance. So the equation says: "if your distance from C is r, you're on the sphere." Simple.</p>
+
+    <h3>Substituting the ray</h3>
+    <p>Our ray is <code>P(t) = Q + t·d</code> (the book uses Q for origin and d for direction). We want to find the <code>t</code> values where <code>P(t)</code> lies on the sphere. Substitute and grind through the algebra and you get a <strong>quadratic equation</strong> in <code>t</code>:</p>
+    <p class="math">t² (d·d) − 2t · d·(C−Q) + (C−Q)·(C−Q) − r² = 0</p>
+    <p>Quadratic = use the quadratic formula. Three cases for the discriminant <code>b² − 4ac</code>:</p>
+    <ul>
+      <li><strong>Discriminant &gt; 0</strong> → two solutions → ray pierces the sphere (enters one side, exits the other)</li>
+      <li><strong>Discriminant = 0</strong> → one solution → ray grazes the sphere (tangent)</li>
+      <li><strong>Discriminant &lt; 0</strong> → no real solution → ray misses</li>
+    </ul>
+
+    <div class="call idea">
+      <div class="label">Why this matters</div>
+      <p>This is the heart of every ray tracer. Once you can detect "ray hits sphere," you can detect "ray hits anything" — triangles, cubes, fractals, all use the same pattern: "given a ray, find the closest <em>t</em> where it intersects me, or report a miss."</p>
+    </div>
+
+    <h3>Code: hit detection</h3>
+    <pre data-file="main.go"><code><span class="cm">// hitSphere returns true if ray r hits a sphere of radius `radius` centred at `center`.</span>
+<span class="kw">func</span> <span class="fn">hitSphere</span>(center Point3, radius <span class="ty">float64</span>, r Ray) <span class="ty">bool</span> {
+    oc := center.<span class="fn">Sub</span>(r.Origin)        <span class="cm">// C - Q</span>
+    a  := <span class="fn">Dot</span>(r.Direction, r.Direction)
+    b  := -<span class="nm">2.0</span> * <span class="fn">Dot</span>(r.Direction, oc)
+    c  := <span class="fn">Dot</span>(oc, oc) - radius*radius
+    discriminant := b*b - <span class="nm">4</span>*a*c
+    <span class="kw">return</span> discriminant &gt;= <span class="nm">0</span>
+}
+
+<span class="kw">func</span> <span class="fn">rayColor</span>(r Ray) Color {
+    <span class="kw">if</span> <span class="fn">hitSphere</span>(<span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>), <span class="nm">0.5</span>, r) {
+        <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">0</span>, <span class="nm">0</span>) <span class="cm">// red</span>
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}</code></pre>
+
+    <p>We're placing a sphere of radius 0.5 at <code>(0, 0, −1)</code> — directly in front of the camera, one unit away.</p>
+
+    <div class="run">go run . &gt; red_sphere.ppm</div>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky2)"/>
+          <circle cx="50" cy="28" r="14" fill="#ff0000"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>A flat red disk</h5>
+        <p>It looks 2D because we're not yet shading — every hit pixel gets the same red.</p>
+      </div>
+    </div>
+
+    <div class="call warn">
+      <div class="label">Subtle bug, fixed later</div>
+      <p>Our hit test returns true for negative <em>t</em> too — meaning the sphere also gets coloured red if it's <em>behind</em> the camera. We'll fix this in the next module when we start caring about <em>which</em> intersection point we hit.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M4: Normals & hittables ============= -->
+<section class="module" id="m4">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">05</div>
+      <div>
+        <h2>Surface Normals &amp; Hittables</h2>
+        <p class="subtitle">Three-dimensional shading. Multiple objects. Clean architecture.</p>
+        <div class="meta-line">Goal · Spheres look 3D, and we can render a list of them.</div>
+      </div>
+    </div>
+
+    <h3>What's a normal?</h3>
+    <p>A <strong>normal</strong> is a unit vector pointing straight out of a surface at a particular point. On a sphere, the normal at any point is just the direction from the centre to that point — like how on Earth, "up" always points away from the planet's centre.</p>
+
+    <p>To <em>see</em> our sphere as 3D, we'll do a classic trick: visualise the normal as a colour. Map the (x, y, z) of the normal — each in [−1, 1] — to (r, g, b) in [0, 1]. Suddenly the sphere has different colours on different sides, and we can perceive its shape.</p>
+
+    <h3>Modify the hit test to return <em>where</em> we hit</h3>
+    <p>Until now <code>hitSphere</code> returned bool. Now we want it to return <code>t</code> — the parameter value at the closest intersection — so we can compute the hit point.</p>
+
+    <pre data-file="main.go"><code><span class="cm">// Returns the smaller t value where the ray hits the sphere, or -1 if it misses.</span>
+<span class="kw">func</span> <span class="fn">hitSphere</span>(center Point3, radius <span class="ty">float64</span>, r Ray) <span class="ty">float64</span> {
+    oc := center.<span class="fn">Sub</span>(r.Origin)
+    a  := r.Direction.<span class="fn">LengthSquared</span>()       <span class="cm">// d·d == |d|²</span>
+    h  := <span class="fn">Dot</span>(r.Direction, oc)              <span class="cm">// simplified — see book</span>
+    c  := oc.<span class="fn">LengthSquared</span>() - radius*radius
+    discriminant := h*h - a*c
+    <span class="kw">if</span> discriminant &lt; <span class="nm">0</span> {
+        <span class="kw">return</span> -<span class="nm">1.0</span>
+    }
+    <span class="kw">return</span> (h - math.<span class="fn">Sqrt</span>(discriminant)) / a    <span class="cm">// closer of the two roots</span>
+}
+
+<span class="kw">func</span> <span class="fn">rayColor</span>(r Ray) Color {
+    t := <span class="fn">hitSphere</span>(<span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>), <span class="nm">0.5</span>, r)
+    <span class="kw">if</span> t &gt; <span class="nm">0</span> {
+        N := r.<span class="fn">At</span>(t).<span class="fn">Sub</span>(<span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>)).<span class="fn">Unit</span>()
+        <span class="kw">return</span> <span class="fn">NewVec3</span>(N.X+<span class="nm">1</span>, N.Y+<span class="nm">1</span>, N.Z+<span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">0.5</span>)
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}</code></pre>
+
+    <p>You'll need to <code>import "math"</code> in main.go. Run it — the sphere now has shaded colours: red on the right, green on top, blue near the camera. That's the <strong>normals visualisation</strong>.</p>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="nrm" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#80c8ff"/>
+              <stop offset="60%" stop-color="#a888d8"/>
+              <stop offset="100%" stop-color="#604888"/>
+            </radialGradient>
+            <linearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky3)"/>
+          <circle cx="50" cy="28" r="14" fill="url(#nrm)"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>Surface-normal shading</h5>
+        <p>Each pixel is coloured by which way the surface faces. The sphere finally looks 3D.</p>
+      </div>
+    </div>
+
+    <h3>Abstraction: the Hittable interface</h3>
+    <p>Right now we hard-code one sphere. Let's design properly: any object that a ray can hit will satisfy a <strong>Hittable</strong> interface. We'll have a <code>Sphere</code> type, and a <code>HittableList</code> that itself is hittable (it just delegates to its children).</p>
+
+    <pre data-file="hittable.go"><code><span class="kw">package</span> main
+
+<span class="cm">// HitRecord captures everything we want to know about a ray-surface intersection.</span>
+<span class="kw">type</span> HitRecord <span class="kw">struct</span> {
+    P         Point3   <span class="cm">// hit point</span>
+    Normal    Vec3     <span class="cm">// surface normal at hit point (unit length)</span>
+    T         <span class="ty">float64</span>  <span class="cm">// ray parameter at hit</span>
+    FrontFace <span class="ty">bool</span>     <span class="cm">// true if ray hit the outside of the surface</span>
+    Mat       Material <span class="cm">// added in module 7 — leave nil for now</span>
+}
+
+<span class="cm">// SetFaceNormal makes Normal point against the incoming ray.</span>
+<span class="kw">func</span> (rec *HitRecord) <span class="fn">SetFaceNormal</span>(r Ray, outwardNormal Vec3) {
+    rec.FrontFace = <span class="fn">Dot</span>(r.Direction, outwardNormal) &lt; <span class="nm">0</span>
+    <span class="kw">if</span> rec.FrontFace {
+        rec.Normal = outwardNormal
+    } <span class="kw">else</span> {
+        rec.Normal = outwardNormal.<span class="fn">Neg</span>()
+    }
+}
+
+<span class="cm">// Hittable is anything a ray can intersect.</span>
+<span class="kw">type</span> Hittable <span class="kw">interface</span> {
+    <span class="fn">Hit</span>(r Ray, tMin, tMax <span class="ty">float64</span>, rec *HitRecord) <span class="ty">bool</span>
+}
+
+<span class="cm">// HittableList itself satisfies Hittable.</span>
+<span class="kw">type</span> HittableList <span class="kw">struct</span> {
+    Objects []Hittable
+}
+
+<span class="kw">func</span> (hl *HittableList) <span class="fn">Add</span>(o Hittable) { hl.Objects = <span class="fn">append</span>(hl.Objects, o) }
+
+<span class="kw">func</span> (hl HittableList) <span class="fn">Hit</span>(r Ray, tMin, tMax <span class="ty">float64</span>, rec *HitRecord) <span class="ty">bool</span> {
+    <span class="kw">var</span> tempRec HitRecord
+    hitAnything := <span class="ty">false</span>
+    closest := tMax
+    <span class="kw">for</span> _, obj := <span class="kw">range</span> hl.Objects {
+        <span class="kw">if</span> obj.<span class="fn">Hit</span>(r, tMin, closest, &amp;tempRec) {
+            hitAnything = <span class="ty">true</span>
+            closest = tempRec.T
+            *rec = tempRec
+        }
+    }
+    <span class="kw">return</span> hitAnything
+}</code></pre>
+
+    <p><strong>Why a Material field on HitRecord?</strong> We'll add real materials in module 7. For now, leave <code>Material</code> as an undefined symbol — we'll create the type stub now so the code compiles.</p>
+
+    <pre data-file="material.go"><code><span class="kw">package</span> main
+
+<span class="cm">// Material — full definition comes in module 7. Stub for now.</span>
+<span class="kw">type</span> Material <span class="kw">interface</span> {
+    <span class="fn">Scatter</span>(rIn Ray, rec *HitRecord) (attenuation Color, scattered Ray, ok <span class="ty">bool</span>)
+}</code></pre>
+
+    <h3>The Sphere type</h3>
+    <pre data-file="sphere.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> <span class="st">"math"</span>
+
+<span class="kw">type</span> Sphere <span class="kw">struct</span> {
+    Center Point3
+    Radius <span class="ty">float64</span>
+    Mat    Material
+}
+
+<span class="kw">func</span> (s Sphere) <span class="fn">Hit</span>(r Ray, tMin, tMax <span class="ty">float64</span>, rec *HitRecord) <span class="ty">bool</span> {
+    oc := s.Center.<span class="fn">Sub</span>(r.Origin)
+    a  := r.Direction.<span class="fn">LengthSquared</span>()
+    h  := <span class="fn">Dot</span>(r.Direction, oc)
+    c  := oc.<span class="fn">LengthSquared</span>() - s.Radius*s.Radius
+    discriminant := h*h - a*c
+    <span class="kw">if</span> discriminant &lt; <span class="nm">0</span> {
+        <span class="kw">return</span> <span class="ty">false</span>
+    }
+    sqrtd := math.<span class="fn">Sqrt</span>(discriminant)
+    <span class="cm">// Find the nearest t in (tMin, tMax)</span>
+    root := (h - sqrtd) / a
+    <span class="kw">if</span> root &lt;= tMin || tMax &lt;= root {
+        root = (h + sqrtd) / a
+        <span class="kw">if</span> root &lt;= tMin || tMax &lt;= root {
+            <span class="kw">return</span> <span class="ty">false</span>
+        }
+    }
+    rec.T = root
+    rec.P = r.<span class="fn">At</span>(root)
+    outwardNormal := rec.P.<span class="fn">Sub</span>(s.Center).<span class="fn">Div</span>(s.Radius)
+    rec.<span class="fn">SetFaceNormal</span>(r, outwardNormal)
+    rec.Mat = s.Mat
+    <span class="kw">return</span> <span class="ty">true</span>
+}</code></pre>
+
+    <h3>Update main: build a world</h3>
+    <pre data-file="main.go"><code><span class="kw">func</span> <span class="fn">rayColor</span>(r Ray, world Hittable) Color {
+    <span class="kw">var</span> rec HitRecord
+    <span class="kw">if</span> world.<span class="fn">Hit</span>(r, <span class="nm">0</span>, math.MaxFloat64, &amp;rec) {
+        <span class="kw">return</span> rec.Normal.<span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>)).<span class="fn">Scale</span>(<span class="nm">0.5</span>)
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}
+
+<span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="cm">// World</span>
+    <span class="kw">var</span> world HittableList
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>),     Radius: <span class="nm">0.5</span>})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, -<span class="nm">100.5</span>, -<span class="nm">1</span>), Radius: <span class="nm">100</span>})  <span class="cm">// the "ground"</span>
+
+    <span class="cm">// ... rest of main is the same as module 3,</span>
+    <span class="cm">// just call rayColor(r, world) instead of rayColor(r) ...</span>
+}</code></pre>
+
+    <p>The trick of using a <strong>giant sphere as the ground</strong> — radius 100, centred 100.5 below the visible sphere — is a classic. Its top surface, where it meets the visible scene, looks essentially flat from the camera's perspective.</p>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <radialGradient id="nrm2" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#80c8ff"/>
+              <stop offset="60%" stop-color="#a888d8"/>
+              <stop offset="100%" stop-color="#604888"/>
+            </radialGradient>
+            <linearGradient id="grnd" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b070"/>
+              <stop offset="100%" stop-color="#a8c890"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky4)"/>
+          <ellipse cx="50" cy="56" rx="80" ry="14" fill="url(#grnd)"/>
+          <circle cx="50" cy="32" r="11" fill="url(#nrm2)"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>Sphere with normal-shading on a normal-shaded ground</h5>
+        <p>Two spheres rendered through one Hittable interface. Now we're an actual ray tracer.</p>
+      </div>
+    </div>
+
+    <h4>Workshop checkpoint</h4>
+    <ul class="checklist">
+      <li>You have <code>vec3.go</code>, <code>ray.go</code>, <code>hittable.go</code>, <code>sphere.go</code>, <code>material.go</code>, <code>main.go</code>.</li>
+      <li>The render shows a small sphere on top of a giant sphere ground.</li>
+      <li>Both look 3D thanks to normal-as-colour shading.</li>
+      <li><strong>Take a 15-minute break before module 6.</strong></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============= M5: Camera & antialiasing ============= -->
+<section class="module" id="m5">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">06</div>
+      <div>
+        <h2>A Camera, an Interval, and Antialiasing</h2>
+        <p class="subtitle">Smooth edges. Cleaner architecture.</p>
+        <div class="meta-line">Goal · Encapsulate the camera. Eliminate jaggies by averaging multiple rays per pixel.</div>
+      </div>
+    </div>
+
+    <h3>Why move the camera into its own type?</h3>
+    <p>Right now <code>main</code> does too much. We'll move all the rendering logic into a <strong>Camera</strong> type. <code>main</code> will only build the world and configure the camera. This pays off massively in module 9 when we add a positionable camera.</p>
+
+    <h3>An Interval helper</h3>
+    <p>We pass <code>tMin, tMax</code> everywhere. Group them into a single <code>Interval</code> type — small thing, but cleans up signatures.</p>
+
+    <pre data-file="interval.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> <span class="st">"math"</span>
+
+<span class="kw">type</span> Interval <span class="kw">struct</span> {
+    Min, Max <span class="ty">float64</span>
+}
+
+<span class="kw">var</span> EmptyInterval    = Interval{math.Inf(<span class="nm">1</span>), math.Inf(-<span class="nm">1</span>)}
+<span class="kw">var</span> UniverseInterval = Interval{math.Inf(-<span class="nm">1</span>), math.Inf(<span class="nm">1</span>)}
+
+<span class="kw">func</span> (i Interval) <span class="fn">Contains</span>(x <span class="ty">float64</span>) <span class="ty">bool</span>  { <span class="kw">return</span> i.Min &lt;= x &amp;&amp; x &lt;= i.Max }
+<span class="kw">func</span> (i Interval) <span class="fn">Surrounds</span>(x <span class="ty">float64</span>) <span class="ty">bool</span> { <span class="kw">return</span> i.Min &lt; x &amp;&amp; x &lt; i.Max }
+<span class="kw">func</span> (i Interval) <span class="fn">Clamp</span>(x <span class="ty">float64</span>) <span class="ty">float64</span> {
+    <span class="kw">if</span> x &lt; i.Min { <span class="kw">return</span> i.Min }
+    <span class="kw">if</span> x &gt; i.Max { <span class="kw">return</span> i.Max }
+    <span class="kw">return</span> x
+}</code></pre>
+
+    <p>Update <code>Hittable</code> and <code>Sphere</code> to take an <code>Interval</code> instead of two floats:</p>
+
+    <pre data-file="hittable.go (update)"><code><span class="kw">type</span> Hittable <span class="kw">interface</span> {
+    <span class="fn">Hit</span>(r Ray, rayT Interval, rec *HitRecord) <span class="ty">bool</span>
+}
+
+<span class="kw">func</span> (hl HittableList) <span class="fn">Hit</span>(r Ray, rayT Interval, rec *HitRecord) <span class="ty">bool</span> {
+    <span class="kw">var</span> tempRec HitRecord
+    hitAnything := <span class="ty">false</span>
+    closest := rayT.Max
+    <span class="kw">for</span> _, obj := <span class="kw">range</span> hl.Objects {
+        <span class="kw">if</span> obj.<span class="fn">Hit</span>(r, Interval{rayT.Min, closest}, &amp;tempRec) {
+            hitAnything = <span class="ty">true</span>
+            closest = tempRec.T
+            *rec = tempRec
+        }
+    }
+    <span class="kw">return</span> hitAnything
+}</code></pre>
+
+    <p>And in <code>sphere.go</code>, replace <code>tMin, tMax float64</code> with <code>rayT Interval</code> and use <code>rayT.Surrounds(root)</code> in the bounds checks.</p>
+
+    <h3>Antialiasing — the jaggies problem</h3>
+    <p>If you zoom into our last image, the edges look like staircases. That's <strong>aliasing</strong>: each pixel is sampled at exactly one point (its centre), so it's either fully sphere or fully sky. Real cameras and real eyes don't work that way — edge pixels are a mix of foreground and background, depending on what proportion of the pixel area each occupies.</p>
+
+    <p>The fix: <strong>shoot many rays per pixel</strong>, each through a slightly different random point inside the pixel's square, and average the results. With 100 samples per pixel, edges become naturally smooth.</p>
+
+    <h3>The Camera type</h3>
+    <pre data-file="camera.go"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> (
+    <span class="st">"fmt"</span>
+    <span class="st">"math"</span>
+    <span class="st">"math/rand"</span>
+    <span class="st">"os"</span>
+)
+
+<span class="kw">type</span> Camera <span class="kw">struct</span> {
+    AspectRatio     <span class="ty">float64</span> <span class="cm">// e.g. 16/9</span>
+    ImageWidth      <span class="ty">int</span>
+    SamplesPerPixel <span class="ty">int</span>
+    MaxDepth        <span class="ty">int</span>     <span class="cm">// max bounces — used in module 6</span>
+
+    <span class="cm">// computed by initialize()</span>
+    imageHeight   <span class="ty">int</span>
+    pixelSamples  <span class="ty">float64</span>
+    center        Point3
+    pixel00       Point3
+    pixelDeltaU   Vec3
+    pixelDeltaV   Vec3
+}
+
+<span class="kw">func</span> (c *Camera) <span class="fn">initialize</span>() {
+    c.imageHeight = <span class="ty">int</span>(<span class="ty">float64</span>(c.ImageWidth) / c.AspectRatio)
+    <span class="kw">if</span> c.imageHeight &lt; <span class="nm">1</span> { c.imageHeight = <span class="nm">1</span> }
+    c.pixelSamples = <span class="nm">1.0</span> / <span class="ty">float64</span>(c.SamplesPerPixel)
+    c.center = <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+
+    focalLength    := <span class="nm">1.0</span>
+    viewportHeight := <span class="nm">2.0</span>
+    viewportWidth  := viewportHeight * <span class="ty">float64</span>(c.ImageWidth) / <span class="ty">float64</span>(c.imageHeight)
+
+    viewportU := <span class="fn">NewVec3</span>(viewportWidth, <span class="nm">0</span>, <span class="nm">0</span>)
+    viewportV := <span class="fn">NewVec3</span>(<span class="nm">0</span>, -viewportHeight, <span class="nm">0</span>)
+
+    c.pixelDeltaU = viewportU.<span class="fn">Div</span>(<span class="ty">float64</span>(c.ImageWidth))
+    c.pixelDeltaV = viewportV.<span class="fn">Div</span>(<span class="ty">float64</span>(c.imageHeight))
+
+    viewportUL := c.center.
+        <span class="fn">Sub</span>(<span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, focalLength)).
+        <span class="fn">Sub</span>(viewportU.<span class="fn">Div</span>(<span class="nm">2</span>)).
+        <span class="fn">Sub</span>(viewportV.<span class="fn">Div</span>(<span class="nm">2</span>))
+    c.pixel00 = viewportUL.<span class="fn">Add</span>(c.pixelDeltaU.<span class="fn">Add</span>(c.pixelDeltaV).<span class="fn">Scale</span>(<span class="nm">0.5</span>))
+}
+
+<span class="cm">// getRay returns a ray for pixel (i, j) with a random sub-pixel offset.</span>
+<span class="kw">func</span> (c *Camera) <span class="fn">getRay</span>(i, j <span class="ty">int</span>) Ray {
+    offsetX := rand.<span class="fn">Float64</span>() - <span class="nm">0.5</span>
+    offsetY := rand.<span class="fn">Float64</span>() - <span class="nm">0.5</span>
+    pixelSample := c.pixel00.
+        <span class="fn">Add</span>(c.pixelDeltaU.<span class="fn">Scale</span>(<span class="ty">float64</span>(i) + offsetX)).
+        <span class="fn">Add</span>(c.pixelDeltaV.<span class="fn">Scale</span>(<span class="ty">float64</span>(j) + offsetY))
+    <span class="kw">return</span> Ray{Origin: c.center, Direction: pixelSample.<span class="fn">Sub</span>(c.center)}
+}
+
+<span class="cm">// rayColor — kept simple for now; we'll evolve this in module 6.</span>
+<span class="kw">func</span> (c *Camera) <span class="fn">rayColor</span>(r Ray, world Hittable) Color {
+    <span class="kw">var</span> rec HitRecord
+    <span class="kw">if</span> world.<span class="fn">Hit</span>(r, Interval{<span class="nm">0</span>, math.MaxFloat64}, &amp;rec) {
+        <span class="kw">return</span> rec.Normal.<span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>)).<span class="fn">Scale</span>(<span class="nm">0.5</span>)
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}
+
+<span class="kw">func</span> (c *Camera) <span class="fn">Render</span>(world Hittable) {
+    c.<span class="fn">initialize</span>()
+    fmt.<span class="fn">Printf</span>(<span class="st">"P3\n%d %d\n255\n"</span>, c.ImageWidth, c.imageHeight)
+    <span class="kw">for</span> j := <span class="nm">0</span>; j &lt; c.imageHeight; j++ {
+        fmt.<span class="fn">Fprintf</span>(os.Stderr, <span class="st">"\rScanlines remaining: %d "</span>, c.imageHeight-j)
+        <span class="kw">for</span> i := <span class="nm">0</span>; i &lt; c.ImageWidth; i++ {
+            pixel := <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+            <span class="kw">for</span> s := <span class="nm">0</span>; s &lt; c.SamplesPerPixel; s++ {
+                r := c.<span class="fn">getRay</span>(i, j)
+                pixel = pixel.<span class="fn">Add</span>(c.<span class="fn">rayColor</span>(r, world))
+            }
+            pixel.<span class="fn">Scale</span>(c.pixelSamples).<span class="fn">WriteColor</span>(os.Stdout)
+        }
+    }
+    fmt.<span class="fn">Fprintln</span>(os.Stderr, <span class="st">"\nDone."</span>)
+}</code></pre>
+
+    <h3>Update <code>WriteColor</code> with clamping</h3>
+    <p>Because we're now averaging colours, a value can occasionally exceed [0, 1] due to floating-point oddities. Clamp it:</p>
+
+    <pre data-file="vec3.go (update WriteColor)"><code><span class="kw">func</span> (c Color) <span class="fn">WriteColor</span>(w io.Writer) {
+    intensity := Interval{<span class="nm">0.000</span>, <span class="nm">0.999</span>}
+    ir := <span class="ty">int</span>(<span class="nm">256</span> * intensity.<span class="fn">Clamp</span>(c.X))
+    ig := <span class="ty">int</span>(<span class="nm">256</span> * intensity.<span class="fn">Clamp</span>(c.Y))
+    ib := <span class="ty">int</span>(<span class="nm">256</span> * intensity.<span class="fn">Clamp</span>(c.Z))
+    fmt.<span class="fn">Fprintf</span>(w, <span class="st">"%d %d %d\n"</span>, ir, ig, ib)
+}</code></pre>
+
+    <h3>Slim, beautiful main</h3>
+    <pre data-file="main.go"><code><span class="kw">func</span> <span class="fn">main</span>() {
+    <span class="kw">var</span> world HittableList
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>),     Radius: <span class="nm">0.5</span>})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, -<span class="nm">100.5</span>, -<span class="nm">1</span>), Radius: <span class="nm">100</span>})
+
+    cam := Camera{
+        AspectRatio:     <span class="nm">16.0</span> / <span class="nm">9.0</span>,
+        ImageWidth:      <span class="nm">400</span>,
+        SamplesPerPixel: <span class="nm">100</span>,
+        MaxDepth:        <span class="nm">50</span>,
+    }
+    cam.<span class="fn">Render</span>(world)
+}</code></pre>
+
+    <div class="run">go run . &gt; antialiased.ppm</div>
+    <p>Notice the rendering is now noticeably slower (100× more rays). Edges should be visibly smoother — soft transitions instead of staircase steps.</p>
+
+    <div class="call warn">
+      <div class="label">Performance note</div>
+      <p>Always run <code>go build -o rt . &amp;&amp; ./rt &gt; img.ppm</code> instead of <code>go run</code> for renders that take more than a few seconds. <code>go run</code> rebuilds every time and adds startup overhead.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M6: Diffuse ============= -->
+<section class="module" id="m6">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">07</div>
+      <div>
+        <h2>Diffuse Materials &amp; Bouncing Light</h2>
+        <p class="subtitle">Light, scattered randomly, becomes shadow.</p>
+        <div class="meta-line">Goal · Realistic matte surfaces. Shadows that emerge naturally from physics, not from a hack.</div>
+      </div>
+    </div>
+
+    <h3>What is "diffuse," really?</h3>
+    <p>A <strong>diffuse</strong> (or matte) surface scatters incoming light in random directions. Think of unfinished wood, plaster, fabric. When light hits it, some of the light is absorbed (depending on colour) and the rest bounces off in some random direction.</p>
+
+    <p>So when our ray hits a diffuse surface, instead of immediately returning a colour, we:</p>
+    <ol>
+      <li>Pick a random direction roughly aligned with the surface normal (i.e., away from the surface, not into it).</li>
+      <li>Send a <em>new</em> ray from the hit point in that direction.</li>
+      <li>Use the colour <em>that ray</em> sees as the colour of this hit, multiplied by the surface's reflectance.</li>
+    </ol>
+    <p>That's recursion — and it's the heart of <strong>path tracing</strong>. Light bounces and bounces and bounces until it eventually escapes to the sky (or gets absorbed). The colour you see is the result of all those bounces.</p>
+
+    <h3>Random unit vectors</h3>
+    <p>We need a way to generate a random direction. The trick is the <strong>rejection method</strong>: generate a random point inside the cube [-1, 1]³, throw it away if it's outside the unit sphere (or pathologically close to zero), and otherwise normalize it.</p>
+
+    <pre data-file="vec3.go (add random helpers)"><code><span class="kw">import</span> <span class="st">"math/rand"</span>
+
+<span class="kw">func</span> <span class="fn">RandomVec3</span>() Vec3 {
+    <span class="kw">return</span> Vec3{rand.<span class="fn">Float64</span>(), rand.<span class="fn">Float64</span>(), rand.<span class="fn">Float64</span>()}
+}
+
+<span class="kw">func</span> <span class="fn">RandomVec3Range</span>(min, max <span class="ty">float64</span>) Vec3 {
+    <span class="kw">return</span> Vec3{
+        min + (max-min)*rand.<span class="fn">Float64</span>(),
+        min + (max-min)*rand.<span class="fn">Float64</span>(),
+        min + (max-min)*rand.<span class="fn">Float64</span>(),
+    }
+}
+
+<span class="kw">func</span> <span class="fn">RandomUnitVector</span>() Vec3 {
+    <span class="kw">for</span> {
+        p := <span class="fn">RandomVec3Range</span>(-<span class="nm">1</span>, <span class="nm">1</span>)
+        lensq := p.<span class="fn">LengthSquared</span>()
+        <span class="kw">if</span> <span class="nm">1e-160</span> &lt; lensq &amp;&amp; lensq &lt;= <span class="nm">1</span> {
+            <span class="kw">return</span> p.<span class="fn">Div</span>(math.<span class="fn">Sqrt</span>(lensq))
+        }
+    }
+}
+
+<span class="cm">// NearZero — used by metal reflections to detect degenerate scatter directions.</span>
+<span class="kw">func</span> (v Vec3) <span class="fn">NearZero</span>() <span class="ty">bool</span> {
+    <span class="kw">const</span> s = <span class="nm">1e-8</span>
+    <span class="kw">return</span> math.<span class="fn">Abs</span>(v.X) &lt; s &amp;&amp; math.<span class="fn">Abs</span>(v.Y) &lt; s &amp;&amp; math.<span class="fn">Abs</span>(v.Z) &lt; s
+}</code></pre>
+
+    <h3>Lambertian distribution — the right way</h3>
+    <p>Instead of scattering uniformly in any direction "above" the surface (which is a valid but cruder model), we use the <strong>Lambertian distribution</strong>: scatter direction = surface normal + random unit vector. This biases scatter toward the normal, which matches how real matte surfaces behave (the angles closer to "straight up off the surface" are more probable).</p>
+
+    <p class="math">scatter_direction = N + random_unit_vector()</p>
+
+    <h3>Update rayColor with bouncing &amp; depth limiting</h3>
+    <p>Recursion needs a base case. Without one, a ray might bounce around forever and overflow the stack. We add <code>depth</code> — when it hits zero, return black (no more light).</p>
+
+    <pre data-file="camera.go (rayColor update)"><code><span class="kw">func</span> (c *Camera) <span class="fn">rayColor</span>(r Ray, depth <span class="ty">int</span>, world Hittable) Color {
+    <span class="kw">if</span> depth &lt;= <span class="nm">0</span> {
+        <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+    }
+    <span class="kw">var</span> rec HitRecord
+    <span class="cm">// tMin = 0.001 to avoid "shadow acne" — see callout below</span>
+    <span class="kw">if</span> world.<span class="fn">Hit</span>(r, Interval{<span class="nm">0.001</span>, math.MaxFloat64}, &amp;rec) {
+        direction := rec.Normal.<span class="fn">Add</span>(<span class="fn">RandomUnitVector</span>())
+        <span class="kw">return</span> c.<span class="fn">rayColor</span>(Ray{rec.P, direction}, depth-<span class="nm">1</span>, world).<span class="fn">Scale</span>(<span class="nm">0.5</span>)
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}</code></pre>
+
+    <p>Don't forget to update the call in <code>Render</code> to pass <code>c.MaxDepth</code>:</p>
+
+    <pre data-file="camera.go (Render update)"><code>pixel = pixel.<span class="fn">Add</span>(c.<span class="fn">rayColor</span>(r, c.MaxDepth, world))</code></pre>
+
+    <div class="call warn">
+      <div class="label">"Shadow acne"</div>
+      <p>Why <code>tMin = 0.001</code> and not <code>0</code>? Because of floating-point imprecision, the new ray's origin might be just below the surface it bounced off of, and immediately re-hit it at <em>t</em> ≈ 0.0000001. Result: speckled black dots all over the spheres. The <code>0.001</code> tolerance ignores those bogus near-zero hits.</p>
+    </div>
+
+    <h3>Gamma correction</h3>
+    <p>The render now looks dark and dingy. Real screens display colour with a non-linear curve (sRGB). To compensate, we raise each colour component to the power 1/γ where γ ≈ 2 — easiest done with a square root:</p>
+
+    <pre data-file="vec3.go (final WriteColor)"><code><span class="kw">func</span> <span class="fn">linearToGamma</span>(c <span class="ty">float64</span>) <span class="ty">float64</span> {
+    <span class="kw">if</span> c &gt; <span class="nm">0</span> { <span class="kw">return</span> math.<span class="fn">Sqrt</span>(c) }
+    <span class="kw">return</span> <span class="nm">0</span>
+}
+
+<span class="kw">func</span> (c Color) <span class="fn">WriteColor</span>(w io.Writer) {
+    r := <span class="fn">linearToGamma</span>(c.X)
+    g := <span class="fn">linearToGamma</span>(c.Y)
+    b := <span class="fn">linearToGamma</span>(c.Z)
+    intensity := Interval{<span class="nm">0.000</span>, <span class="nm">0.999</span>}
+    fmt.<span class="fn">Fprintf</span>(w, <span class="st">"%d %d %d\n"</span>,
+        <span class="ty">int</span>(<span class="nm">256</span>*intensity.<span class="fn">Clamp</span>(r)),
+        <span class="ty">int</span>(<span class="nm">256</span>*intensity.<span class="fn">Clamp</span>(g)),
+        <span class="ty">int</span>(<span class="nm">256</span>*intensity.<span class="fn">Clamp</span>(b)),
+    )
+}</code></pre>
+
+    <p>The image now looks bright, with realistic soft shadows underneath the sphere. <strong>This is path tracing.</strong> The shadow exists because rays bouncing in those directions hit the bottom of the sphere instead of the bright sky.</p>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <linearGradient id="grnd2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#a0a0a0"/>
+              <stop offset="100%" stop-color="#606060"/>
+            </linearGradient>
+            <radialGradient id="diff" cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stop-color="#d0d0d0"/>
+              <stop offset="80%" stop-color="#404040"/>
+              <stop offset="100%" stop-color="#202020"/>
+            </radialGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky5)"/>
+          <ellipse cx="50" cy="56" rx="80" ry="14" fill="url(#grnd2)"/>
+          <ellipse cx="50" cy="44" rx="11" ry="2" fill="#000" opacity="0.4"/>
+          <circle cx="50" cy="32" r="11" fill="url(#diff)"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>A real diffuse sphere on diffuse ground</h5>
+        <p>Soft shadow underneath. Sky tint visible on the top of the sphere.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M7: Materials & metal ============= -->
+<section class="module" id="m7">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">08</div>
+      <div>
+        <h2>Metal &amp; Reflective Surfaces</h2>
+        <p class="subtitle">Mirrors, polished steel, and rays that don't pick directions at random.</p>
+        <div class="meta-line">Goal · Define a Material interface. Add Lambertian and Metal materials.</div>
+      </div>
+    </div>
+
+    <h3>The Material interface, properly</h3>
+    <p>So far the "material" was hard-coded into <code>rayColor</code>: every hit produced a half-strength scattered ray. That's not flexible. Let's give every surface a <strong>material</strong> that decides:</p>
+    <ul>
+      <li>Should the ray scatter, or be absorbed?</li>
+      <li>If it scatters, which direction does the new ray go?</li>
+      <li>By what colour does it tint the bounce (this is the <strong>attenuation</strong>)?</li>
+    </ul>
+
+    <pre data-file="material.go (replace stub)"><code><span class="kw">package</span> main
+
+<span class="kw">import</span> <span class="st">"math"</span>
+
+<span class="kw">type</span> Material <span class="kw">interface</span> {
+    <span class="fn">Scatter</span>(rIn Ray, rec *HitRecord) (attenuation Color, scattered Ray, ok <span class="ty">bool</span>)
+}
+
+<span class="cm">// --- Lambertian (diffuse) ---</span>
+<span class="kw">type</span> Lambertian <span class="kw">struct</span> {
+    Albedo Color
+}
+
+<span class="kw">func</span> (l Lambertian) <span class="fn">Scatter</span>(rIn Ray, rec *HitRecord) (Color, Ray, <span class="ty">bool</span>) {
+    dir := rec.Normal.<span class="fn">Add</span>(<span class="fn">RandomUnitVector</span>())
+    <span class="cm">// Catch degenerate cases where dir cancels out</span>
+    <span class="kw">if</span> dir.<span class="fn">NearZero</span>() {
+        dir = rec.Normal
+    }
+    <span class="kw">return</span> l.Albedo, Ray{rec.P, dir}, <span class="ty">true</span>
+}
+
+<span class="cm">// --- Metal ---</span>
+<span class="kw">type</span> Metal <span class="kw">struct</span> {
+    Albedo Color
+    Fuzz   <span class="ty">float64</span> <span class="cm">// 0 = mirror, 1 = very rough</span>
+}
+
+<span class="kw">func</span> <span class="fn">Reflect</span>(v, n Vec3) Vec3 {
+    <span class="kw">return</span> v.<span class="fn">Sub</span>(n.<span class="fn">Scale</span>(<span class="nm">2</span> * <span class="fn">Dot</span>(v, n)))
+}
+
+<span class="kw">func</span> (m Metal) <span class="fn">Scatter</span>(rIn Ray, rec *HitRecord) (Color, Ray, <span class="ty">bool</span>) {
+    reflected := <span class="fn">Reflect</span>(rIn.Direction.<span class="fn">Unit</span>(), rec.Normal)
+    fuzz := math.<span class="fn">Min</span>(m.Fuzz, <span class="nm">1</span>)
+    reflected = reflected.<span class="fn">Add</span>(<span class="fn">RandomUnitVector</span>().<span class="fn">Scale</span>(fuzz))
+    scattered := Ray{rec.P, reflected}
+    ok := <span class="fn">Dot</span>(scattered.Direction, rec.Normal) &gt; <span class="nm">0</span>
+    <span class="kw">return</span> m.Albedo, scattered, ok
+}</code></pre>
+
+    <h4>Plain English: how does reflection work?</h4>
+    <p>When a ray hits a mirror, it bounces off at the same angle on the other side of the normal — like a billiard ball off a cushion. The formula <code>v − 2(v·n)n</code> says: take the incoming direction, subtract twice its component along the normal. The result is the reflected direction.</p>
+    <p>For <strong>fuzzy metal</strong> (brushed steel, less than perfect mirrors), we add a tiny random vector to the reflected direction. Bigger fuzz = blurrier reflection.</p>
+
+    <h3>Plug materials into rayColor</h3>
+    <pre data-file="camera.go (rayColor)"><code><span class="kw">func</span> (c *Camera) <span class="fn">rayColor</span>(r Ray, depth <span class="ty">int</span>, world Hittable) Color {
+    <span class="kw">if</span> depth &lt;= <span class="nm">0</span> {
+        <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+    }
+    <span class="kw">var</span> rec HitRecord
+    <span class="kw">if</span> world.<span class="fn">Hit</span>(r, Interval{<span class="nm">0.001</span>, math.MaxFloat64}, &amp;rec) {
+        attenuation, scattered, ok := rec.Mat.<span class="fn">Scatter</span>(r, &amp;rec)
+        <span class="kw">if</span> ok {
+            <span class="kw">return</span> attenuation.<span class="fn">Mul</span>(c.<span class="fn">rayColor</span>(scattered, depth-<span class="nm">1</span>, world))
+        }
+        <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+    }
+    unitDir := r.Direction.<span class="fn">Unit</span>()
+    a := <span class="nm">0.5</span> * (unitDir.Y + <span class="nm">1.0</span>)
+    <span class="kw">return</span> <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>).<span class="fn">Scale</span>(<span class="nm">1.0</span>-a).
+        <span class="fn">Add</span>(<span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.7</span>, <span class="nm">1.0</span>).<span class="fn">Scale</span>(a))
+}</code></pre>
+
+    <h3>A scene with mixed materials</h3>
+    <pre data-file="main.go"><code><span class="kw">func</span> <span class="fn">main</span>() {
+    matGround := Lambertian{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.8</span>, <span class="nm">0.8</span>, <span class="nm">0.0</span>)}  <span class="cm">// yellowish</span>
+    matCenter := Lambertian{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.1</span>, <span class="nm">0.2</span>, <span class="nm">0.5</span>)}  <span class="cm">// blue matte</span>
+    matLeft   := Metal{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.8</span>, <span class="nm">0.8</span>, <span class="nm">0.8</span>), Fuzz: <span class="nm">0.0</span>}  <span class="cm">// mirror</span>
+    matRight  := Metal{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.8</span>, <span class="nm">0.6</span>, <span class="nm">0.2</span>), Fuzz: <span class="nm">0.5</span>}  <span class="cm">// fuzzy gold</span>
+
+    <span class="kw">var</span> world HittableList
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, -<span class="nm">100.5</span>, -<span class="nm">1</span>), Radius: <span class="nm">100</span>, Mat: matGround})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1.2</span>),    Radius: <span class="nm">0.5</span>, Mat: matCenter})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(-<span class="nm">1</span>, <span class="nm">0</span>, -<span class="nm">1</span>),     Radius: <span class="nm">0.5</span>, Mat: matLeft})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">0</span>, -<span class="nm">1</span>),      Radius: <span class="nm">0.5</span>, Mat: matRight})
+
+    cam := Camera{
+        AspectRatio:     <span class="nm">16.0</span> / <span class="nm">9.0</span>,
+        ImageWidth:      <span class="nm">400</span>,
+        SamplesPerPixel: <span class="nm">100</span>,
+        MaxDepth:        <span class="nm">50</span>,
+    }
+    cam.<span class="fn">Render</span>(world)
+}</code></pre>
+
+    <div class="run">go build -o rt . &amp;&amp; ./rt &gt; metal.ppm</div>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky6)"/>
+          <ellipse cx="50" cy="56" rx="80" ry="14" fill="#c8c828"/>
+          <circle cx="22" cy="34" r="9" fill="#c8c8c8"/>
+          <circle cx="50" cy="34" r="9" fill="#1f3380"/>
+          <circle cx="78" cy="34" r="9" fill="#cc9844"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>Mirror, blue matte, fuzzy gold</h5>
+        <p>The mirror sphere reflects the world. Notice the rough sphere has a slightly blurry reflection.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M8: Dielectrics ============= -->
+<section class="module" id="m8">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">09</div>
+      <div>
+        <h2>Dielectrics — Glass That Refracts</h2>
+        <p class="subtitle">When light bends. Snell, Schlick, and total internal reflection.</p>
+        <div class="meta-line">Goal · A glass sphere that bends light realistically.</div>
+      </div>
+    </div>
+
+    <h3>What's a dielectric?</h3>
+    <p>Glass, water, diamonds — clear materials that <strong>refract</strong> light (bend it as it enters and exits) instead of reflecting it. The amount of bending depends on the <strong>refractive index</strong> (η, "eta"): air ≈ 1.0, water ≈ 1.33, glass ≈ 1.5, diamond ≈ 2.4.</p>
+
+    <h3>Snell's law in plain English</h3>
+    <p>When light crosses from medium A (refractive index η<sub>A</sub>) into medium B (η<sub>B</sub>), the angle changes according to:</p>
+    <p class="math">η<sub>A</sub> · sin(θ<sub>A</sub>) = η<sub>B</sub> · sin(θ<sub>B</sub>)</p>
+    <p>If the new medium is denser, the ray bends <em>toward</em> the normal. If it's less dense, the ray bends <em>away</em>. And in some cases — when leaving glass at a steep angle — the equation has no solution, and the ray <strong>can't refract at all</strong>. That's <em>total internal reflection</em>, which is why glass spheres have those bright spots.</p>
+
+    <h3>Refract &amp; Schlick approximation</h3>
+    <p>The <strong>Schlick approximation</strong> tells us how the probability of reflection (vs refraction) varies with the viewing angle. At grazing angles, even glass reflects most of the light — that's why a calm pond is mirror-like when you look across it.</p>
+
+    <pre data-file="vec3.go (add Refract)"><code><span class="cm">// Refract returns the refracted ray direction given an incoming unit vector,</span>
+<span class="cm">// the surface normal, and the ratio etaIn / etaOut.</span>
+<span class="kw">func</span> <span class="fn">Refract</span>(uv, n Vec3, etaiOverEtat <span class="ty">float64</span>) Vec3 {
+    cosTheta := math.<span class="fn">Min</span>(<span class="fn">Dot</span>(uv.<span class="fn">Neg</span>(), n), <span class="nm">1.0</span>)
+    rOutPerp     := uv.<span class="fn">Add</span>(n.<span class="fn">Scale</span>(cosTheta)).<span class="fn">Scale</span>(etaiOverEtat)
+    rOutParallel := n.<span class="fn">Scale</span>(-math.<span class="fn">Sqrt</span>(math.<span class="fn">Abs</span>(<span class="nm">1.0</span> - rOutPerp.<span class="fn">LengthSquared</span>())))
+    <span class="kw">return</span> rOutPerp.<span class="fn">Add</span>(rOutParallel)
+}</code></pre>
+
+    <pre data-file="material.go (add Dielectric)"><code><span class="kw">import</span> <span class="st">"math/rand"</span>
+
+<span class="kw">type</span> Dielectric <span class="kw">struct</span> {
+    RefractionIndex <span class="ty">float64</span>
+}
+
+<span class="kw">func</span> <span class="fn">schlick</span>(cosine, refIdx <span class="ty">float64</span>) <span class="ty">float64</span> {
+    r0 := (<span class="nm">1</span> - refIdx) / (<span class="nm">1</span> + refIdx)
+    r0 = r0 * r0
+    <span class="kw">return</span> r0 + (<span class="nm">1</span>-r0)*math.<span class="fn">Pow</span>(<span class="nm">1</span>-cosine, <span class="nm">5</span>)
+}
+
+<span class="kw">func</span> (d Dielectric) <span class="fn">Scatter</span>(rIn Ray, rec *HitRecord) (Color, Ray, <span class="ty">bool</span>) {
+    attenuation := <span class="fn">NewVec3</span>(<span class="nm">1</span>, <span class="nm">1</span>, <span class="nm">1</span>) <span class="cm">// glass doesn't absorb light</span>
+    ri := d.RefractionIndex
+    <span class="kw">if</span> rec.FrontFace {
+        ri = <span class="nm">1.0</span> / d.RefractionIndex
+    }
+    unitDir := rIn.Direction.<span class="fn">Unit</span>()
+    cosTheta := math.<span class="fn">Min</span>(<span class="fn">Dot</span>(unitDir.<span class="fn">Neg</span>(), rec.Normal), <span class="nm">1.0</span>)
+    sinTheta := math.<span class="fn">Sqrt</span>(<span class="nm">1.0</span> - cosTheta*cosTheta)
+
+    cannotRefract := ri*sinTheta &gt; <span class="nm">1.0</span>
+    <span class="kw">var</span> direction Vec3
+    <span class="kw">if</span> cannotRefract || <span class="fn">schlick</span>(cosTheta, ri) &gt; rand.<span class="fn">Float64</span>() {
+        direction = <span class="fn">Reflect</span>(unitDir, rec.Normal)
+    } <span class="kw">else</span> {
+        direction = <span class="fn">Refract</span>(unitDir, rec.Normal, ri)
+    }
+    <span class="kw">return</span> attenuation, Ray{rec.P, direction}, <span class="ty">true</span>
+}</code></pre>
+
+    <h3>The hollow glass trick</h3>
+    <p>A glass sphere with a slightly smaller glass sphere of negative radius inside it gives you a <strong>hollow glass shell</strong> — like a glass marble. Negative radius doesn't change the geometry, but it inverts the surface normal, so the inside of the outer sphere acts like the inside of a soap bubble.</p>
+
+    <pre data-file="main.go (replace center sphere with glass)"><code>matCenter := Dielectric{RefractionIndex: <span class="nm">1.50</span>}                <span class="cm">// glass</span>
+matBubble := Dielectric{RefractionIndex: <span class="nm">1.00</span> / <span class="nm">1.50</span>}         <span class="cm">// air pocket inside</span>
+
+world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1.2</span>), Radius: <span class="nm">0.5</span>,  Mat: matCenter})
+world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1.2</span>), Radius: <span class="nm">0.4</span>,  Mat: matBubble})</code></pre>
+
+    <p>Wait — but our Sphere uses radius for normalisation and would crash on negative radius. The book handles this by using <code>fmax(0, radius)</code> in the constructor. We can adopt a different convention: keep radius positive but flip the normal in the scatter logic. The simpler approach: use the trick from the book — make the inner sphere a smaller positive-radius dielectric with the inverted refractive index.</p>
+
+    <div class="render-preview">
+      <div class="img-wrap">
+        <svg viewBox="0 0 100 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sky7" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#80b3ff"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <radialGradient id="glass" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+              <stop offset="60%" stop-color="#c8d8e8" stop-opacity="0.4"/>
+              <stop offset="95%" stop-color="#80a0c0"/>
+              <stop offset="100%" stop-color="#ffffff"/>
+            </radialGradient>
+          </defs>
+          <rect width="100" height="56" fill="url(#sky7)"/>
+          <ellipse cx="50" cy="56" rx="80" ry="14" fill="#c8c828"/>
+          <circle cx="22" cy="34" r="9" fill="#c8c8c8"/>
+          <circle cx="50" cy="34" r="9" fill="url(#glass)"/>
+          <circle cx="50" cy="34" r="6" fill="#9bbbdd" opacity="0.3"/>
+          <circle cx="78" cy="34" r="9" fill="#cc9844"/>
+        </svg>
+      </div>
+      <div class="caption">
+        <span class="label">Expected output</span>
+        <h5>Glass, mirror, gold</h5>
+        <p>The glass sphere shows refraction — the world behind it appears flipped and bent.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============= M9: Positionable camera ============= -->
+<section class="module" id="m9">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">10</div>
+      <div>
+        <h2>A Positionable Camera</h2>
+        <p class="subtitle">Look from anywhere. Look at anything.</p>
+        <div class="meta-line">Goal · Configurable look-from, look-at, vertical field of view.</div>
+      </div>
+    </div>
+
+    <h3>Three new things</h3>
+    <ul>
+      <li><strong>vfov</strong> — vertical field of view in degrees. 90° = wide, 20° = telephoto.</li>
+      <li><strong>lookFrom</strong> — where the camera <em>is</em>.</li>
+      <li><strong>lookAt</strong> — where the camera <em>points</em>.</li>
+      <li><strong>vUp</strong> — what direction is "up" for the camera. Usually (0, 1, 0).</li>
+    </ul>
+
+    <p>From these, we compute three orthogonal unit vectors that form the camera's local coordinate system:</p>
+    <ul>
+      <li><strong>w</strong> = (lookFrom − lookAt).Unit() — points <em>away</em> from the target</li>
+      <li><strong>u</strong> = Cross(vUp, w).Unit() — camera-right</li>
+      <li><strong>v</strong> = Cross(w, u) — camera-up</li>
+    </ul>
+
+    <h3>Update Camera</h3>
+    <pre data-file="camera.go"><code><span class="kw">type</span> Camera <span class="kw">struct</span> {
+    AspectRatio     <span class="ty">float64</span>
+    ImageWidth      <span class="ty">int</span>
+    SamplesPerPixel <span class="ty">int</span>
+    MaxDepth        <span class="ty">int</span>
+    VFov            <span class="ty">float64</span> <span class="cm">// vertical field of view, degrees</span>
+    LookFrom        Point3
+    LookAt          Point3
+    VUp             Vec3
+
+    <span class="cm">// computed</span>
+    imageHeight  <span class="ty">int</span>
+    pixelSamples <span class="ty">float64</span>
+    center       Point3
+    pixel00      Point3
+    pixelDeltaU  Vec3
+    pixelDeltaV  Vec3
+}
+
+<span class="kw">func</span> (c *Camera) <span class="fn">initialize</span>() {
+    c.imageHeight = <span class="ty">int</span>(<span class="ty">float64</span>(c.ImageWidth) / c.AspectRatio)
+    <span class="kw">if</span> c.imageHeight &lt; <span class="nm">1</span> { c.imageHeight = <span class="nm">1</span> }
+    c.pixelSamples = <span class="nm">1.0</span> / <span class="ty">float64</span>(c.SamplesPerPixel)
+    c.center = c.LookFrom
+
+    focalLength := c.LookFrom.<span class="fn">Sub</span>(c.LookAt).<span class="fn">Length</span>()
+    theta := c.VFov * math.Pi / <span class="nm">180.0</span>
+    h := math.<span class="fn">Tan</span>(theta / <span class="nm">2</span>)
+    viewportHeight := <span class="nm">2</span> * h * focalLength
+    viewportWidth  := viewportHeight * <span class="ty">float64</span>(c.ImageWidth) / <span class="ty">float64</span>(c.imageHeight)
+
+    w := c.LookFrom.<span class="fn">Sub</span>(c.LookAt).<span class="fn">Unit</span>()
+    u := <span class="fn">Cross</span>(c.VUp, w).<span class="fn">Unit</span>()
+    v := <span class="fn">Cross</span>(w, u)
+
+    viewportU := u.<span class="fn">Scale</span>(viewportWidth)
+    viewportV := v.<span class="fn">Neg</span>().<span class="fn">Scale</span>(viewportHeight)
+    c.pixelDeltaU = viewportU.<span class="fn">Div</span>(<span class="ty">float64</span>(c.ImageWidth))
+    c.pixelDeltaV = viewportV.<span class="fn">Div</span>(<span class="ty">float64</span>(c.imageHeight))
+
+    viewportUL := c.center.
+        <span class="fn">Sub</span>(w.<span class="fn">Scale</span>(focalLength)).
+        <span class="fn">Sub</span>(viewportU.<span class="fn">Div</span>(<span class="nm">2</span>)).
+        <span class="fn">Sub</span>(viewportV.<span class="fn">Div</span>(<span class="nm">2</span>))
+    c.pixel00 = viewportUL.<span class="fn">Add</span>(c.pixelDeltaU.<span class="fn">Add</span>(c.pixelDeltaV).<span class="fn">Scale</span>(<span class="nm">0.5</span>))
+}</code></pre>
+
+    <p>Now you can configure the camera anywhere:</p>
+
+    <pre data-file="main.go"><code>cam := Camera{
+    AspectRatio:     <span class="nm">16.0</span> / <span class="nm">9.0</span>,
+    ImageWidth:      <span class="nm">400</span>,
+    SamplesPerPixel: <span class="nm">100</span>,
+    MaxDepth:        <span class="nm">50</span>,
+    VFov:            <span class="nm">20</span>,
+    LookFrom:        <span class="fn">NewVec3</span>(-<span class="nm">2</span>, <span class="nm">2</span>, <span class="nm">1</span>),
+    LookAt:          <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, -<span class="nm">1</span>),
+    VUp:             <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">1</span>, <span class="nm">0</span>),
+}</code></pre>
+
+    <p>You're now looking at the scene from above and to the left. Try different values to get a feel for the controls.</p>
+  </div>
+</section>
+
+<!-- ============= M10: Defocus blur ============= -->
+<section class="module" id="m10">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">11</div>
+      <div>
+        <h2>Defocus Blur</h2>
+        <p class="subtitle">Depth of field. The cinematic effect.</p>
+        <div class="meta-line">Goal · Things at the focus distance are sharp; things in front or behind are blurred.</div>
+      </div>
+    </div>
+
+    <h3>Why does defocus exist?</h3>
+    <p>Real cameras have lenses with finite size. Light from a point at the focus distance converges to a single pixel — sharp. Light from any other distance lands as a small disk — blur. The bigger the lens (or aperture), the more dramatic the blur.</p>
+
+    <p>To simulate it, instead of shooting every ray from a single camera point, we shoot from a <strong>random point on a small disk</strong> centred at the camera. All these rays still aim at the same pixel target on the focus plane, so points exactly at that distance always look the same — but other points get a slightly different ray each sample, producing blur.</p>
+
+    <h3>Code: random point on a disk</h3>
+    <pre data-file="vec3.go (add)"><code><span class="kw">func</span> <span class="fn">RandomInUnitDisk</span>() Vec3 {
+    <span class="kw">for</span> {
+        p := Vec3{rand.<span class="fn">Float64</span>()*<span class="nm">2</span> - <span class="nm">1</span>, rand.<span class="fn">Float64</span>()*<span class="nm">2</span> - <span class="nm">1</span>, <span class="nm">0</span>}
+        <span class="kw">if</span> p.<span class="fn">LengthSquared</span>() &lt; <span class="nm">1</span> {
+            <span class="kw">return</span> p
+        }
+    }
+}</code></pre>
+
+    <h3>Update Camera with aperture &amp; focus distance</h3>
+    <pre data-file="camera.go"><code><span class="kw">type</span> Camera <span class="kw">struct</span> {
+    <span class="cm">// ... previous fields ...</span>
+    DefocusAngle <span class="ty">float64</span>  <span class="cm">// in degrees, 0 = no blur</span>
+    FocusDist    <span class="ty">float64</span>  <span class="cm">// distance to plane of perfect focus</span>
+
+    <span class="cm">// computed</span>
+    defocusDiskU Vec3
+    defocusDiskV Vec3
+}</code></pre>
+
+    <p>In <code>initialize</code>, replace <code>focalLength := lookFrom.Sub(lookAt).Length()</code> with the explicit focus distance, and add at the end:</p>
+
+    <pre data-file="camera.go (initialize, end)"><code>defocusRadius := c.FocusDist * math.<span class="fn">Tan</span>((c.DefocusAngle/<span class="nm">2</span>) * math.Pi / <span class="nm">180</span>)
+c.defocusDiskU = u.<span class="fn">Scale</span>(defocusRadius)
+c.defocusDiskV = v.<span class="fn">Scale</span>(defocusRadius)</code></pre>
+
+    <p>And update <code>getRay</code>:</p>
+
+    <pre data-file="camera.go (getRay)"><code><span class="kw">func</span> (c *Camera) <span class="fn">getRay</span>(i, j <span class="ty">int</span>) Ray {
+    offsetX := rand.<span class="fn">Float64</span>() - <span class="nm">0.5</span>
+    offsetY := rand.<span class="fn">Float64</span>() - <span class="nm">0.5</span>
+    pixelSample := c.pixel00.
+        <span class="fn">Add</span>(c.pixelDeltaU.<span class="fn">Scale</span>(<span class="ty">float64</span>(i) + offsetX)).
+        <span class="fn">Add</span>(c.pixelDeltaV.<span class="fn">Scale</span>(<span class="ty">float64</span>(j) + offsetY))
+
+    <span class="kw">var</span> origin Point3
+    <span class="kw">if</span> c.DefocusAngle &lt;= <span class="nm">0</span> {
+        origin = c.center
+    } <span class="kw">else</span> {
+        p := <span class="fn">RandomInUnitDisk</span>()
+        origin = c.center.
+            <span class="fn">Add</span>(c.defocusDiskU.<span class="fn">Scale</span>(p.X)).
+            <span class="fn">Add</span>(c.defocusDiskV.<span class="fn">Scale</span>(p.Y))
+    }
+    <span class="kw">return</span> Ray{Origin: origin, Direction: pixelSample.<span class="fn">Sub</span>(origin)}
+}</code></pre>
+
+    <p>Set <code>DefocusAngle</code> to about <code>0.6</code> and <code>FocusDist</code> to <code>3.4</code> in main, and you'll see crisp spheres at that distance with soft, blurred backgrounds.</p>
+  </div>
+</section>
+
+<!-- ============= M11: Final render ============= -->
+<section class="module" id="m11">
+  <div class="wrap">
+    <div class="module-head">
+      <div class="module-num">12</div>
+      <div>
+        <h2>The Final Render</h2>
+        <p class="subtitle">Hundreds of spheres. The cover image.</p>
+        <div class="meta-line">Goal · Recreate the iconic Ray Tracing in One Weekend cover scene.</div>
+      </div>
+    </div>
+
+    <h3>The scene</h3>
+    <p>Three big spheres (one glass, one matte brown, one polished metal) on a vast diffuse ground, surrounded by hundreds of small randomly-placed, randomly-coloured, randomly-material spheres. This is what the whole book has been building to.</p>
+
+    <pre data-file="main.go"><code><span class="kw">func</span> <span class="fn">randomScene</span>() HittableList {
+    <span class="kw">var</span> world HittableList
+    ground := Lambertian{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.5</span>, <span class="nm">0.5</span>, <span class="nm">0.5</span>)}
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, -<span class="nm">1000</span>, <span class="nm">0</span>), Radius: <span class="nm">1000</span>, Mat: ground})
+
+    <span class="kw">for</span> a := -<span class="nm">11</span>; a &lt; <span class="nm">11</span>; a++ {
+        <span class="kw">for</span> b := -<span class="nm">11</span>; b &lt; <span class="nm">11</span>; b++ {
+            chooseMat := rand.<span class="fn">Float64</span>()
+            center := <span class="fn">NewVec3</span>(
+                <span class="ty">float64</span>(a) + <span class="nm">0.9</span>*rand.<span class="fn">Float64</span>(),
+                <span class="nm">0.2</span>,
+                <span class="ty">float64</span>(b) + <span class="nm">0.9</span>*rand.<span class="fn">Float64</span>(),
+            )
+            <span class="kw">if</span> center.<span class="fn">Sub</span>(<span class="fn">NewVec3</span>(<span class="nm">4</span>, <span class="nm">0.2</span>, <span class="nm">0</span>)).<span class="fn">Length</span>() &lt;= <span class="nm">0.9</span> {
+                <span class="kw">continue</span>
+            }
+            <span class="kw">var</span> mat Material
+            <span class="kw">switch</span> {
+            <span class="kw">case</span> chooseMat &lt; <span class="nm">0.8</span>:  <span class="cm">// diffuse</span>
+                albedo := <span class="fn">RandomVec3</span>().<span class="fn">Mul</span>(<span class="fn">RandomVec3</span>())
+                mat = Lambertian{Albedo: albedo}
+            <span class="kw">case</span> chooseMat &lt; <span class="nm">0.95</span>: <span class="cm">// metal</span>
+                albedo := <span class="fn">RandomVec3Range</span>(<span class="nm">0.5</span>, <span class="nm">1</span>)
+                fuzz   := rand.<span class="fn">Float64</span>() * <span class="nm">0.5</span>
+                mat = Metal{Albedo: albedo, Fuzz: fuzz}
+            <span class="kw">default</span>:                <span class="cm">// glass</span>
+                mat = Dielectric{RefractionIndex: <span class="nm">1.5</span>}
+            }
+            world.<span class="fn">Add</span>(Sphere{Center: center, Radius: <span class="nm">0.2</span>, Mat: mat})
+        }
+    }
+
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">1</span>, <span class="nm">0</span>),  Radius: <span class="nm">1.0</span>, Mat: Dielectric{RefractionIndex: <span class="nm">1.5</span>}})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(-<span class="nm">4</span>, <span class="nm">1</span>, <span class="nm">0</span>), Radius: <span class="nm">1.0</span>, Mat: Lambertian{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.4</span>, <span class="nm">0.2</span>, <span class="nm">0.1</span>)}})
+    world.<span class="fn">Add</span>(Sphere{Center: <span class="fn">NewVec3</span>(<span class="nm">4</span>, <span class="nm">1</span>, <span class="nm">0</span>),  Radius: <span class="nm">1.0</span>, Mat: Metal{Albedo: <span class="fn">NewVec3</span>(<span class="nm">0.7</span>, <span class="nm">0.6</span>, <span class="nm">0.5</span>), Fuzz: <span class="nm">0.0</span>}})
+
+    <span class="kw">return</span> world
+}
+
+<span class="kw">func</span> <span class="fn">main</span>() {
+    world := <span class="fn">randomScene</span>()
+    cam := Camera{
+        AspectRatio:     <span class="nm">16.0</span> / <span class="nm">9.0</span>,
+        ImageWidth:      <span class="nm">1200</span>,
+        SamplesPerPixel: <span class="nm">500</span>,
+        MaxDepth:        <span class="nm">50</span>,
+        VFov:            <span class="nm">20</span>,
+        LookFrom:        <span class="fn">NewVec3</span>(<span class="nm">13</span>, <span class="nm">2</span>, <span class="nm">3</span>),
+        LookAt:          <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>),
+        VUp:             <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">1</span>, <span class="nm">0</span>),
+        DefocusAngle:    <span class="nm">0.6</span>,
+        FocusDist:       <span class="nm">10.0</span>,
+    }
+    cam.<span class="fn">Render</span>(world)
+}</code></pre>
+
+    <h3>Performance — go parallel</h3>
+    <p>This render at 1200×675 with 500 samples per pixel is <em>slow</em>. Hours, on a single core. Go's goroutines make parallelisation embarrassingly easy. Add this to <code>Render</code>:</p>
+
+    <pre data-file="camera.go (parallel render — bonus)"><code><span class="kw">import</span> <span class="st">"runtime"</span>
+<span class="kw">import</span> <span class="st">"sync"</span>
+
+<span class="kw">func</span> (c *Camera) <span class="fn">Render</span>(world Hittable) {
+    c.<span class="fn">initialize</span>()
+    <span class="cm">// Allocate the full pixel buffer up front</span>
+    pixels := <span class="fn">make</span>([]Color, c.ImageWidth*c.imageHeight)
+
+    <span class="kw">var</span> wg sync.WaitGroup
+    workers := runtime.<span class="fn">NumCPU</span>()
+    rowsPerWorker := (c.imageHeight + workers - <span class="nm">1</span>) / workers
+    <span class="kw">var</span> done atomic.Int64
+
+    <span class="kw">for</span> w := <span class="nm">0</span>; w &lt; workers; w++ {
+        wg.<span class="fn">Add</span>(<span class="nm">1</span>)
+        <span class="kw">go</span> <span class="kw">func</span>(workerID <span class="ty">int</span>) {
+            <span class="kw">defer</span> wg.<span class="fn">Done</span>()
+            startJ := workerID * rowsPerWorker
+            endJ := startJ + rowsPerWorker
+            <span class="kw">if</span> endJ &gt; c.imageHeight {
+                endJ = c.imageHeight
+            }
+            <span class="kw">for</span> j := startJ; j &lt; endJ; j++ {
+                <span class="kw">for</span> i := <span class="nm">0</span>; i &lt; c.ImageWidth; i++ {
+                    pixel := <span class="fn">NewVec3</span>(<span class="nm">0</span>, <span class="nm">0</span>, <span class="nm">0</span>)
+                    <span class="kw">for</span> s := <span class="nm">0</span>; s &lt; c.SamplesPerPixel; s++ {
+                        r := c.<span class="fn">getRay</span>(i, j)
+                        pixel = pixel.<span class="fn">Add</span>(c.<span class="fn">rayColor</span>(r, c.MaxDepth, world))
+                    }
+                    pixels[j*c.ImageWidth+i] = pixel.<span class="fn">Scale</span>(c.pixelSamples)
+                }
+                d := done.<span class="fn">Add</span>(<span class="nm">1</span>)
+                fmt.<span class="fn">Fprintf</span>(os.Stderr, <span class="st">"\rRendered %d / %d rows "</span>, d, <span class="ty">int64</span>(c.imageHeight))
+            }
+        }(w)
+    }
+    wg.<span class="fn">Wait</span>()
+
+    <span class="cm">// Write the assembled image</span>
+    fmt.<span class="fn">Printf</span>(<span class="st">"P3\n%d %d\n255\n"</span>, c.ImageWidth, c.imageHeight)
+    <span class="kw">for</span> _, p := <span class="kw">range</span> pixels {
+        p.<span class="fn">WriteColor</span>(os.Stdout)
+    }
+    fmt.<span class="fn">Fprintln</span>(os.Stderr, <span class="st">"\nDone."</span>)
+}</code></pre>
+
+    <p>Add <code>"sync/atomic"</code> to your imports. On an 8-core machine, this gives you roughly a 6–7× speedup. Note: <code>math/rand</code> is goroutine-safe in modern Go, but for absolute reproducibility you'd want each worker to have its own <code>*rand.Rand</code> instance.</p>
+
+    <div class="run">go build -o rt . &amp;&amp; ./rt &gt; final.ppm</div>
+    <p>Convert PPM to PNG with ImageMagick: <code>convert final.ppm final.png</code>. Or use a viewer that handles PPM directly.</p>
+
+    <h3>What you've built</h3>
+    <table>
+      <thead>
+        <tr><th>Concept</th><th>Lines of Go</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Vec3 + helpers</td><td>~100</td></tr>
+        <tr><td>Ray + Hittable + Sphere</td><td>~80</td></tr>
+        <tr><td>Camera with antialiasing &amp; defocus</td><td>~120</td></tr>
+        <tr><td>Lambertian + Metal + Dielectric</td><td>~80</td></tr>
+        <tr><td>Interval + Color helpers</td><td>~30</td></tr>
+        <tr><td>main + scene</td><td>~50</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>~460 lines</strong></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Where to go next</h3>
+    <ul>
+      <li><strong>Book 2 — Ray Tracing: The Next Week.</strong> Adds motion blur, BVH acceleration structures (huge speedup), texture mapping, lights, and volumetric fog.</li>
+      <li><strong>Book 3 — Ray Tracing: The Rest of Your Life.</strong> The proper math: Monte Carlo integration, importance sampling, the rendering equation.</li>
+      <li><strong>Optimisation in your Go version</strong> — pool the random number generator per-goroutine, store materials by index instead of by interface value (cache friendlier), explore SIMD with assembly.</li>
+      <li><strong>Triangles &amp; meshes.</strong> Replace your spheres with a triangle Hittable that reads OBJ files. Now you can render any 3D model.</li>
+    </ul>
+
+    <h4>Workshop wrap-up checklist</h4>
+    <ul class="checklist">
+      <li>Cover image rendered (or rendering — that's allowed).</li>
+      <li>Code pushed to your own GitHub.</li>
+      <li>One twist of your own: a custom scene, a new material, a different camera angle.</li>
+      <li>Share with the group: "the one thing I learned that surprised me."</li>
+    </ul>
+
+    <div class="call idea">
+      <div class="label">A note from the original authors</div>
+      <p>Peter Shirley, Trevor David Black, and Steve Hollasch wrote <em>Ray Tracing in One Weekend</em> and gave it away for free. If this workshop landed for you, give them a star on the <a href="https://github.com/RayTracing/raytracing.github.io" style="color:var(--accent)">RayTracing GitHub repo</a> and tell other people about the books. They are some of the best free programming material on the web.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Workshop adapted to Go from <em>Ray Tracing in One Weekend</em> by Peter Shirley, Trevor David Black, and Steve Hollasch.</p>
+    <p style="margin-top:8px">Original book: <a href="https://raytracing.github.io/books/RayTracingInOneWeekend.html">raytracing.github.io</a> · Released under CC0.</p>
+  </div>
+</footer>
+
+</body>
+</html>
