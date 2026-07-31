@@ -1,0 +1,4130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compilers &amp; Interpreters in Go — A Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f1621;
+    --panel:#161f2b;
+    --panel-2:#1c2734;
+    --panel-3:#212d3b;
+    --rule:#2a3644;
+    --rule-soft:#212b38;
+    --text:#ccd6e0;
+    --text-dim:#8695a8;
+    --text-dimmer:#5d6b7d;
+    --signal:#52dbc7;
+    --signal-dim:#2f7d72;
+    --amber:#e8a23d;
+    --amber-dim:#8a642a;
+    --danger:#e2645a;
+    --paper:#e9e2d2;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --rail-w: 3px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--font-body);
+    line-height:1.6;
+    font-size:16px;
+  }
+  ::selection{background:var(--signal-dim); color:#fff;}
+  a{color:var(--signal);}
+  h1,h2,h3,h4{font-family:var(--font-display); color:#eef2f6; margin:0 0 .5em;}
+  p{margin:0 0 1em;}
+  .wrap{max-width:920px; margin:0 auto; padding:0 28px;}
+  code, .mono{font-family:var(--font-mono);}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    background:rgba(15,22,33,0.9);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--rule);
+  }
+  .topbar-inner{
+    max-width:920px; margin:0 auto; padding:14px 28px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .brand{
+    font-family:var(--font-display); font-weight:700; font-size:15px;
+    color:#eef2f6; letter-spacing:.02em; white-space:nowrap;
+    display:flex; align-items:center; gap:8px;
+  }
+  .brand .dot{width:8px; height:8px; border-radius:50%; background:var(--signal); box-shadow:0 0 8px var(--signal);}
+  .topnav{display:flex; gap:2px; overflow-x:auto; scrollbar-width:none;}
+  .topnav::-webkit-scrollbar{display:none;}
+  .topnav a{
+    font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+    text-decoration:none; padding:6px 10px; border-radius:6px; white-space:nowrap;
+    transition:color .15s, background .15s;
+  }
+  .topnav a:hover{color:var(--text); background:var(--panel-2);}
+  .topnav a.active{color:var(--signal); background:rgba(82,219,199,0.08);}
+
+  /* ---------- Hero ---------- */
+  .hero{padding:64px 0 40px; position:relative;}
+  .eyebrow{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--signal); margin-bottom:18px; display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:""; width:24px; height:1px; background:var(--signal);}
+  .hero h1{
+    font-size:clamp(2.1rem, 4.5vw, 3.2rem); line-height:1.08; font-weight:700;
+    max-width:14ch;
+  }
+  .hero .sub{
+    font-size:1.05rem; color:var(--text-dim); max-width:56ch; margin-top:18px;
+  }
+  .hero-stats{display:flex; gap:28px; margin-top:28px; flex-wrap:wrap;}
+  .hero-stat{font-family:var(--font-mono);}
+  .hero-stat .n{color:var(--amber); font-size:1.3rem; font-weight:600; display:block;}
+  .hero-stat .l{color:var(--text-dimmer); font-size:12px; text-transform:uppercase; letter-spacing:.08em;}
+
+  /* ---------- Live tokenizer widget ---------- */
+  .tokenizer{
+    margin-top:40px; border:1px solid var(--rule); border-radius:10px;
+    background:var(--panel); overflow:hidden;
+  }
+  .tokenizer-bar{
+    display:flex; align-items:center; gap:8px; padding:10px 14px;
+    border-bottom:1px solid var(--rule); background:var(--panel-2);
+  }
+  .tokenizer-bar .tf-dot{width:9px; height:9px; border-radius:50%; background:var(--rule);}
+  .tokenizer-bar .label{font-family:var(--font-mono); font-size:12px; color:var(--text-dim); margin-left:4px;}
+  .tokenizer-body{padding:16px;}
+  #tk-input{
+    width:100%; background:var(--panel-2); border:1px solid var(--rule); border-radius:6px;
+    color:var(--text); font-family:var(--font-mono); font-size:14px; padding:10px 12px;
+    resize:vertical; min-height:56px;
+  }
+  #tk-input:focus{outline:none; border-color:var(--signal-dim);}
+  .tk-output{
+    margin-top:12px; display:flex; flex-wrap:wrap; gap:6px; min-height:34px;
+  }
+  .tk-tok{
+    font-family:var(--font-mono); font-size:12px; padding:4px 8px; border-radius:5px;
+    border:1px solid var(--rule); background:var(--panel-2); color:var(--text-dim);
+    display:inline-flex; gap:6px; align-items:center;
+  }
+  .tk-tok .ty{color:var(--signal); font-weight:600;}
+  .tk-tok.kw .ty{color:var(--amber);}
+
+  /* ---------- Sections ---------- */
+  section{padding:56px 0;}
+  section.divider-top{border-top:1px solid var(--rule);}
+  .section-head{margin-bottom:28px;}
+  .section-head h2{font-size:1.6rem;}
+  .lede{color:var(--text-dim); max-width:64ch;}
+
+  .card{
+    background:var(--panel); border:1px solid var(--rule); border-radius:10px; padding:22px 24px;
+    margin:18px 0;
+  }
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:720px){.grid-2{grid-template-columns:1fr;}}
+
+  .filetree{
+    font-family:var(--font-mono); font-size:13px; color:var(--text-dim); line-height:1.9;
+    background:var(--panel-2); border:1px solid var(--rule); border-radius:8px; padding:16px 18px;
+  }
+  .filetree .f{color:var(--text);}
+  .filetree .new{color:var(--signal);}
+  .filetree .chg{color:var(--amber);}
+
+  /* ---------- Pipeline rail (signature element) ---------- */
+  .pipeline{position:relative; padding-left:38px; margin:8px 0 0;}
+  .pipeline::before{
+    content:""; position:absolute; left:11px; top:6px; bottom:6px; width:var(--rail-w);
+    background:linear-gradient(var(--rule), var(--rule));
+    border-radius:2px;
+  }
+  .stage{position:relative; padding-bottom:36px;}
+  .stage:last-child{padding-bottom:0;}
+  .stage-node{
+    position:absolute; left:-38px; top:2px; width:26px; height:26px; border-radius:7px;
+    background:var(--panel-2); border:1px solid var(--rule);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--text-dim);
+    transition:all .25s ease;
+  }
+  .stage.active .stage-node{
+    background:var(--signal); border-color:var(--signal); color:#0b1119;
+    box-shadow:0 0 0 4px rgba(82,219,199,0.15);
+  }
+  .stage h4{font-size:1.05rem; margin-bottom:4px;}
+  .stage .stage-desc{color:var(--text-dim); font-size:14px; max-width:52ch;}
+
+  /* ---------- Session ---------- */
+  .session{scroll-margin-top:70px;}
+  .session-head{
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px;
+  }
+  .session-num{
+    font-family:var(--font-mono); color:var(--amber); font-size:14px; letter-spacing:.06em;
+  }
+  .session-dur{
+    font-family:var(--font-mono); font-size:12px; color:var(--text-dimmer);
+    border:1px solid var(--rule); border-radius:999px; padding:3px 10px;
+  }
+  .session h2{font-size:1.7rem; margin-top:2px;}
+  .obj-list{list-style:none; padding:0; margin:18px 0;}
+  .obj-list li{
+    padding:9px 0 9px 26px; position:relative; color:var(--text-dim); font-size:14.5px;
+    border-bottom:1px dashed var(--rule-soft);
+  }
+  .obj-list li:last-child{border-bottom:none;}
+  .obj-list li::before{
+    content:"→"; position:absolute; left:0; color:var(--signal); font-family:var(--font-mono);
+  }
+
+  .step{margin:30px 0;}
+  .step-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:10px;
+  }
+  .step-badge{
+    font-family:var(--font-mono); font-size:11px; color:#0b1119; background:var(--signal);
+    border-radius:5px; padding:2px 8px; font-weight:700; flex:none;
+  }
+  .step h3{font-size:1.1rem; margin:0;}
+
+  /* ---------- Code blocks ---------- */
+  .code-file{
+    border:1px solid var(--rule); border-radius:9px; overflow:hidden; margin:14px 0 22px;
+    background:#0d141d;
+  }
+  .code-file-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:8px 14px; background:var(--panel-2); border-bottom:1px solid var(--rule);
+  }
+  .code-file-name{
+    font-family:var(--font-mono); font-size:12.5px; color:var(--text-dim);
+    display:flex; align-items:center; gap:8px;
+  }
+  .code-file-name .tag{
+    font-size:10px; text-transform:uppercase; letter-spacing:.06em; padding:2px 6px; border-radius:4px;
+  }
+  .tag.new{background:rgba(82,219,199,0.12); color:var(--signal); border:1px solid var(--signal-dim);}
+  .tag.edit{background:rgba(232,162,61,0.12); color:var(--amber); border:1px solid var(--amber-dim);}
+  .copy-btn{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-dim); background:transparent;
+    border:1px solid var(--rule); border-radius:5px; padding:4px 9px; cursor:pointer;
+    transition:all .15s;
+  }
+  .copy-btn:hover{color:var(--text); border-color:var(--text-dimmer);}
+  .copy-btn.copied{color:var(--signal); border-color:var(--signal-dim);}
+  pre.code-block{
+    margin:0; padding:16px 18px; overflow-x:auto; font-family:var(--font-mono);
+    font-size:13px; line-height:1.65; color:var(--text);
+  }
+  .tok-kw{color:#e8a23d;}
+  .tok-str{color:#8fd18b;}
+  .tok-com{color:var(--text-dimmer); font-style:italic;}
+  .tok-num{color:#7fb8e0;}
+  .tok-type{color:#c99ee8;}
+  .tok-const{color:#e88ab0;}
+
+  .run-block{
+    border:1px solid var(--rule); border-radius:9px; background:#0a1017; margin:14px 0 22px;
+    overflow:hidden;
+  }
+  .run-bar{
+    padding:8px 14px; background:var(--panel-2); border-bottom:1px solid var(--rule);
+    font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+  }
+  .run-block pre{margin:0; padding:14px 18px; font-family:var(--font-mono); font-size:12.5px; color:var(--text-dim); overflow-x:auto;}
+  .run-block .prompt{color:var(--signal);}
+  .run-block .out{color:var(--text);}
+
+  .callout{
+    border-left:3px solid var(--signal); background:rgba(82,219,199,0.05);
+    border-radius:0 8px 8px 0; padding:14px 18px; margin:20px 0; font-size:14.5px;
+  }
+  .callout.warn{border-left-color:var(--amber); background:rgba(232,162,61,0.05);}
+  .callout.gotcha{border-left-color:var(--danger); background:rgba(226,100,90,0.05);}
+  .callout .k{
+    font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--signal); display:block; margin-bottom:6px;
+  }
+  .callout.warn .k{color:var(--amber);}
+  .callout.gotcha .k{color:var(--danger);}
+
+  .exercise{
+    border:1px solid var(--amber-dim); border-radius:10px; padding:20px 22px; margin:28px 0;
+    background:linear-gradient(180deg, rgba(232,162,61,0.06), transparent 60%);
+  }
+  .exercise-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .exercise-head .icon{
+    width:26px; height:26px; border-radius:7px; background:rgba(232,162,61,0.15);
+    color:var(--amber); display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:13px; flex:none;
+  }
+  .exercise h4{font-size:1rem; margin:0; color:#f0e4d0;}
+  .exercise ol, .exercise ul{margin:10px 0; padding-left:20px; color:var(--text-dim); font-size:14.5px;}
+  .exercise li{margin-bottom:6px;}
+
+  details.reveal{
+    margin-top:14px; border:1px solid var(--rule); border-radius:8px; overflow:hidden;
+  }
+  details.reveal summary{
+    cursor:pointer; padding:10px 14px; font-family:var(--font-mono); font-size:12.5px;
+    color:var(--text-dim); background:var(--panel-2); list-style:none; user-select:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  details.reveal summary::-webkit-details-marker{display:none;}
+  details.reveal summary::before{content:"▸"; color:var(--signal); transition:transform .15s;}
+  details.reveal[open] summary::before{transform:rotate(90deg);}
+  details.reveal .reveal-body{padding:4px 16px 16px;}
+
+  .checkpoint{
+    display:flex; gap:14px; align-items:flex-start; background:var(--panel-2);
+    border:1px solid var(--rule); border-radius:10px; padding:16px 20px; margin:26px 0;
+  }
+  .checkpoint .mark{
+    font-family:var(--font-mono); color:var(--signal); font-size:18px; flex:none; margin-top:1px;
+  }
+  .checkpoint b{color:#eef2f6;}
+
+  footer{
+    border-top:1px solid var(--rule); padding:44px 0 60px; color:var(--text-dimmer); font-size:13.5px;
+  }
+  footer a{color:var(--text-dim);}
+
+  .btn-row{display:flex; gap:12px; flex-wrap:wrap; margin-top:24px;}
+  .btn{
+    font-family:var(--font-mono); font-size:13px; padding:10px 18px; border-radius:7px;
+    text-decoration:none; border:1px solid var(--rule); color:var(--text); transition:all .15s;
+  }
+  .btn.primary{background:var(--signal); color:#0b1119; border-color:var(--signal); font-weight:600;}
+  .btn.primary:hover{background:#69e6d4;}
+  .btn:hover{border-color:var(--text-dimmer);}
+
+  ::-webkit-scrollbar{height:8px; width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--rule); border-radius:4px;}
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto;}
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand"><span class="dot"></span> nuru workshop</div>
+    <nav class="topnav" id="topnav">
+      <a href="#setup">Setup</a>
+      <a href="#s1">S1 · Lexer</a>
+      <a href="#s2">S2 · AST</a>
+      <a href="#s3">S3 · Control flow</a>
+      <a href="#s4">S4 · Eval</a>
+      <a href="#s5">S5 · Closures</a>
+      <a href="#s6">S6 · Bytecode</a>
+      <a href="#next">Next steps</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+  <section class="hero">
+    <div class="eyebrow">A hands-on Go workshop</div>
+    <h1>Build a compiler and an interpreter, from scratch, in Go.</h1>
+    <p class="sub">
+      Six sessions. No frameworks, no parser generators — just the Go standard library
+      and your own two hands. By the end you'll have built <strong>Nuru</strong>, a small
+      programming language, twice: once as a tree-walking interpreter, and once as a
+      bytecode compiler with its own virtual machine.
+    </p>
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="n">6</span><span class="l">Sessions</span></div>
+      <div class="hero-stat"><span class="n">1h 30m</span><span class="l">Per session</span></div>
+      <div class="hero-stat"><span class="n">0</span><span class="l">Dependencies</span></div>
+      <div class="hero-stat"><span class="n">100%</span><span class="l">Tested code</span></div>
+    </div>
+
+    <div class="tokenizer">
+      <div class="tokenizer-bar">
+        <span class="tf-dot"></span><span class="tf-dot"></span><span class="tf-dot"></span>
+        <span class="label">live preview — this is what Session 1 teaches you to build</span>
+      </div>
+      <div class="tokenizer-body">
+        <textarea id="tk-input" spellcheck="false">let total = price * 2 + 5;</textarea>
+        <div class="tk-output" id="tk-output"></div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="wrap">
+  <section id="setup" class="session divider-top">
+    <div class="section-head">
+      <div class="eyebrow">Before session 1</div>
+      <h2>How this workshop works</h2>
+      <p class="lede">
+        Every session builds directly on the last. You'll keep one Go module —
+        <code>nuru</code> — open for the whole workshop, adding and changing files
+        as you go. Nothing here is pseudocode: every listing on this page was
+        compiled and run with <code>go 1.22</code> before being written down.
+      </p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h4 style="margin-bottom:10px;">What you need</h4>
+        <ul class="obj-list" style="margin:0;">
+          <li>Go 1.21 or newer installed (<code>go version</code> to check)</li>
+          <li>A terminal and an editor — nothing fancier required</li>
+          <li>~6 months of Go under your belt: you're comfortable with structs, pointers, slices, maps, and interfaces</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin-bottom:10px;">One module, six sessions</h4>
+        <div class="filetree">
+mkdir nuru &amp;&amp; cd nuru<br>
+go mod init nuru<br>
+<span class="f">token.go</span>      <span class="new"># session 1</span><br>
+<span class="f">lexer.go</span>      <span class="new"># session 1</span><br>
+<span class="f">ast.go</span>        <span class="new"># session 2, grows in 3</span><br>
+<span class="f">parser.go</span>     <span class="new"># session 2, grows in 3</span><br>
+<span class="f">object.go</span>     <span class="new"># session 4, grows in 5</span><br>
+<span class="f">evaluator.go</span>  <span class="new"># session 4, grows in 5</span><br>
+<span class="f">environment.go</span><span class="new"> # session 5</span><br>
+<span class="f">main.go</span>       <span class="chg"># you'll replace this each session</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:22px;">
+      The language we're building is called <strong>Nuru</strong> — Swahili for
+      "light", in the spirit of what a compiler pipeline does: it shines a light
+      through your source code, one stage at a time, until nothing about it is
+      a mystery. Nuru has integers, booleans, arithmetic, variables, conditionals,
+      and first-class functions with closures. It's deliberately small, so you
+      spend your time on how a language works rather than typing out a big spec.
+    </p>
+
+    <div class="callout">
+      <span class="k">Running the checks yourself</span>
+      Every code listing is followed by a terminal block showing the exact
+      output you should see from <code>go run .</code>. If your output
+      doesn't match, that's a more useful signal than any explanation — go
+      back and compare your file against the listing before moving on.
+    </div>
+
+    <div class="section-head" style="margin-top:48px;">
+      <h2>The pipeline, end to end</h2>
+      <p class="lede">Every session adds one stage. Source text goes in the top; a result comes out the bottom.</p>
+    </div>
+    <div class="pipeline" id="overview-pipeline">
+      <div class="stage" data-stage="1">
+        <div class="stage-node">01</div>
+        <h4>Lexer</h4>
+        <p class="stage-desc">Turns raw source text into a flat stream of tokens — <code>let</code>, <code>x</code>, <code>=</code>, <code>5</code>, <code>;</code> — throwing away whitespace and comments.</p>
+      </div>
+      <div class="stage" data-stage="2">
+        <div class="stage-node">02</div>
+        <h4>Parser · statements &amp; Pratt parsing</h4>
+        <p class="stage-desc">Groups tokens into a tree (the AST) using recursive descent, with operator-precedence ("Pratt") parsing for expressions.</p>
+      </div>
+      <div class="stage" data-stage="3">
+        <div class="stage-node">03</div>
+        <h4>Parser · control flow &amp; functions</h4>
+        <p class="stage-desc">Extends the parser with <code>if</code>/<code>else</code>, function literals, and call expressions.</p>
+      </div>
+      <div class="stage" data-stage="4">
+        <div class="stage-node">04</div>
+        <h4>Evaluator</h4>
+        <p class="stage-desc">Walks the AST directly and produces values — a tree-walking interpreter.</p>
+      </div>
+      <div class="stage" data-stage="5">
+        <div class="stage-node">05</div>
+        <h4>Environment &amp; closures</h4>
+        <p class="stage-desc">Adds variable scopes, function calls, and closures — functions that remember where they were defined.</p>
+      </div>
+      <div class="stage" data-stage="6">
+        <div class="stage-node">06</div>
+        <h4>Compiler &amp; VM</h4>
+        <p class="stage-desc">A second execution strategy: compile the AST to bytecode and run it on a small stack machine.</p>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="wrap">
+<section id="s1" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 01</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>The lexer: turning text into tokens</h2>
+  <p class="lede">
+    Before anything can be parsed, understood, or run, source code is just a
+    string. The lexer's job is to walk that string one character at a time and
+    group characters into <em>tokens</em> — the smallest meaningful chunks of
+    the language.
+  </p>
+
+  <ul class="obj-list">
+    <li>Understand why every compiler and interpreter starts with lexing</li>
+    <li>Define a <code>Token</code> type and the token types Nuru needs</li>
+    <li>Build a <code>Lexer</code> that turns source text into a token stream</li>
+    <li>Handle multi-character operators like <code>==</code> and <code>!=</code> correctly</li>
+  </ul>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>Define the token types</h3></div>
+    <p>Create <code>token.go</code>. Every token has a <code>Type</code> (what kind of thing it is) and a <code>Literal</code> (the actual text it came from).</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>token.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s1-token">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s1-token" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s1-token">package main
+
+type TokenType string
+
+const (
+	ILLEGAL = "ILLEGAL"
+	EOF     = "EOF"
+
+	// Identifiers + literals
+	IDENT = "IDENT" // x, foo, add
+	INT   = "INT"   // 123
+
+	// Operators
+	ASSIGN   = "="
+	PLUS     = "+"
+	MINUS    = "-"
+	BANG     = "!"
+	ASTERISK = "*"
+	SLASH    = "/"
+
+	LT = "<"
+	GT = ">"
+	EQ = "=="
+	NEQ = "!="
+
+	// Delimiters
+	COMMA     = ","
+	SEMICOLON = ";"
+
+	LPAREN = "("
+	RPAREN = ")"
+	LBRACE = "{"
+	RBRACE = "}"
+
+	// Keywords
+	FUNCTION = "FUNCTION"
+	LET      = "LET"
+	TRUE     = "TRUE"
+	FALSE    = "FALSE"
+	IF       = "IF"
+	ELSE     = "ELSE"
+	RETURN   = "RETURN"
+)
+
+type Token struct {
+	Type    TokenType
+	Literal string
+}
+
+var keywords = map[string]TokenType{
+	"fn":     FUNCTION,
+	"let":    LET,
+	"true":   TRUE,
+	"false":  FALSE,
+	"if":     IF,
+	"else":   ELSE,
+	"return": RETURN,
+}
+
+// LookupIdent tells us whether an identifier is actually a keyword.
+func LookupIdent(ident string) TokenType {
+	if tok, ok := keywords[ident]; ok {
+		return tok
+	}
+	return IDENT
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Build the lexer</h3></div>
+    <p>
+      Create <code>lexer.go</code>. The <code>Lexer</code> keeps a position in the
+      input and a one-character lookahead (<code>peekChar</code>), which is exactly
+      what you need to tell <code>=</code> apart from <code>==</code>.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>lexer.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s1-lexer">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s1-lexer" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s1-lexer">package main
+
+type Lexer struct {
+	input        string
+	position     int  // points to current char
+	readPosition int  // points to next char to read
+	ch           byte // current char under examination
+}
+
+func NewLexer(input string) *Lexer {
+	l := &Lexer{input: input}
+	l.readChar()
+	return l
+}
+
+func (l *Lexer) readChar() {
+	if l.readPosition >= len(l.input) {
+		l.ch = 0 // ASCII "NUL", signals EOF
+	} else {
+		l.ch = l.input[l.readPosition]
+	}
+	l.position = l.readPosition
+	l.readPosition++
+}
+
+func (l *Lexer) peekChar() byte {
+	if l.readPosition >= len(l.input) {
+		return 0
+	}
+	return l.input[l.readPosition]
+}
+
+func (l *Lexer) skipWhitespace() {
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+		l.readChar()
+	}
+}
+
+func isLetter(ch byte) bool {
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+}
+
+func isDigit(ch byte) bool {
+	return '0' <= ch && ch <= '9'
+}
+
+func (l *Lexer) readIdentifier() string {
+	start := l.position
+	for isLetter(l.ch) {
+		l.readChar()
+	}
+	return l.input[start:l.position]
+}
+
+func (l *Lexer) readNumber() string {
+	start := l.position
+	for isDigit(l.ch) {
+		l.readChar()
+	}
+	return l.input[start:l.position]
+}
+
+func newToken(tokenType TokenType, ch byte) Token {
+	return Token{Type: tokenType, Literal: string(ch)}
+}
+
+func (l *Lexer) NextToken() Token {
+	var tok Token
+
+	l.skipWhitespace()
+
+	switch l.ch {
+	case '=':
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = Token{Type: EQ, Literal: "=="}
+		} else {
+			tok = newToken(ASSIGN, l.ch)
+		}
+	case '!':
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = Token{Type: NEQ, Literal: "!="}
+		} else {
+			tok = newToken(BANG, l.ch)
+		}
+	case '+':
+		tok = newToken(PLUS, l.ch)
+	case '-':
+		tok = newToken(MINUS, l.ch)
+	case '/':
+		tok = newToken(SLASH, l.ch)
+	case '*':
+		tok = newToken(ASTERISK, l.ch)
+	case '<':
+		tok = newToken(LT, l.ch)
+	case '>':
+		tok = newToken(GT, l.ch)
+	case ';':
+		tok = newToken(SEMICOLON, l.ch)
+	case ',':
+		tok = newToken(COMMA, l.ch)
+	case '(':
+		tok = newToken(LPAREN, l.ch)
+	case ')':
+		tok = newToken(RPAREN, l.ch)
+	case '{':
+		tok = newToken(LBRACE, l.ch)
+	case '}':
+		tok = newToken(RBRACE, l.ch)
+	case 0:
+		tok.Literal = ""
+		tok.Type = EOF
+	default:
+		if isLetter(l.ch) {
+			tok.Literal = l.readIdentifier()
+			tok.Type = LookupIdent(tok.Literal)
+			return tok // early return: readIdentifier already advanced past the token
+		} else if isDigit(l.ch) {
+			tok.Type = INT
+			tok.Literal = l.readNumber()
+			return tok
+		} else {
+			tok = newToken(ILLEGAL, l.ch)
+		}
+	}
+
+	l.readChar()
+	return tok
+}</script>
+
+    <div class="callout">
+      <span class="k">Why the early return</span>
+      Notice <code>readIdentifier</code> and <code>readNumber</code> already
+      advance <code>l.position</code> past the whole word or number, so
+      those two branches <code>return tok</code> immediately instead of
+      falling through to the <code>l.readChar()</code> at the bottom —
+      otherwise you'd skip a character every time.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Try it</h3></div>
+    <p>Replace <code>main.go</code> with a quick harness that prints every token it sees.</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s1-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s1-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s1-main">package main
+
+import "fmt"
+
+func main() {
+	input := `let five = 5;
+let ten = 10;
+
+let add = fn(x, y) {
+  x + y;
+};
+
+let result = add(five, ten);
+!-/*5;
+5 < 10 > 5;
+
+if (5 < 10) {
+	return true;
+} else {
+	return false;
+}
+
+10 == 10;
+10 != 9;
+`
+
+	l := NewLexer(input)
+
+	for tok := l.NextToken(); tok.Type != EOF; tok = l.NextToken() {
+		fmt.Printf("%+v\n", tok)
+	}
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+{Type:LET Literal:let}
+{Type:IDENT Literal:five}
+{Type:= Literal:=}
+{Type:INT Literal:5}
+{Type:; Literal:;}
+{Type:LET Literal:let}
+{Type:IDENT Literal:ten}
+{Type:= Literal:=}
+{Type:INT Literal:10}
+{Type:; Literal:;}
+{Type:LET Literal:let}
+{Type:IDENT Literal:add}
+{Type:= Literal:=}
+{Type:FUNCTION Literal:fn}
+{Type:( Literal:(}
+{Type:IDENT Literal:x}
+{Type:, Literal:,}
+{Type:IDENT Literal:y}
+{Type:) Literal:)}
+{Type:{ Literal:{}
+{Type:IDENT Literal:x}
+{Type:+ Literal:+}
+{Type:IDENT Literal:y}
+{Type:; Literal:;}
+{Type:} Literal:}}
+<span class="out">... (truncated — 40 more tokens, ending in the final IF/ELSE/RETURN block)</span></pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <span class="mark">✓</span>
+    <div><b>Checkpoint.</b> If your token stream matches (types and literals both), your lexer is solid enough to build a whole language on top of. That's genuinely the hard part of this session — parsers lean on the lexer being reliable.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">%</span><h4>Exercise — add the modulo operator</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">
+      This is the first of a running exercise: you'll carry the <code>%</code>
+      operator through every remaining session, all the way to the bytecode VM.
+    </p>
+    <ol>
+      <li>Add a <code>PERCENT = "%"</code> constant to <code>token.go</code>.</li>
+      <li>Add a <code>case '%':</code> branch to <code>NextToken</code> in <code>lexer.go</code> that returns a <code>PERCENT</code> token.</li>
+      <li>Confirm <code>10 % 3;</code> lexes into <code>INT(10)</code>, <code>PERCENT(%)</code>, <code>INT(3)</code>, <code>;</code>.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>token.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex1-token" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex1-token">	ASTERISK = "*"
+	PERCENT  = "%"
+	SLASH    = "/"</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>lexer.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex1-lexer" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex1-lexer">	case '*':
+		tok = newToken(ASTERISK, l.ch)
+	case '%':
+		tok = newToken(PERCENT, l.ch)</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>  <span style="color:var(--text-dimmer)"># with input "10 % 3;"</span>
+{Type:INT Literal:10}
+{Type:% Literal:%}
+{Type:INT Literal:3}
+{Type:; Literal:;}</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="s2" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 02</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>The AST, and parsing expressions with precedence</h2>
+  <p class="lede">
+    A token stream is flat; code is not. <code>5 + 5 * 2</code> needs to become
+    a tree where multiplication is nested <em>inside</em> the addition, not
+    sitting next to it. This session builds the tree (the AST) and the parser
+    that produces it — including the trick that makes precedence work.
+  </p>
+
+  <ul class="obj-list">
+    <li>Define <code>Node</code>, <code>Statement</code>, and <code>Expression</code> as Go interfaces</li>
+    <li>Model <code>let</code>, <code>return</code>, and bare-expression statements</li>
+    <li>Parse <code>let</code>/<code>return</code> with straightforward recursive descent</li>
+    <li>Parse arithmetic and boolean expressions with a Pratt (operator-precedence) parser</li>
+  </ul>
+
+  <div class="callout">
+    <span class="k">The core idea of Pratt parsing</span>
+    Every token that can <em>start</em> an expression gets a "prefix" parse
+    function (numbers, identifiers, <code>-x</code>, <code>!x</code>). Every
+    token that can <em>continue</em> one gets an "infix" parse function, tagged
+    with a precedence. <code>parseExpression</code> parses the left-hand side,
+    then keeps folding in infix operators for as long as the next operator
+    binds <em>tighter</em> than the one it's currently inside. That one rule
+    is what makes <code>*</code> nest inside <code>+</code> automatically.
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>Define the AST nodes</h3></div>
+    <p>
+      Create <code>ast.go</code>. <code>Statement</code> and <code>Expression</code>
+      both embed <code>Node</code>, so anything that implements one also gives you
+      <code>TokenLiteral()</code> and <code>String()</code> for free — <code>String()</code>
+      is what lets us print a whole tree back out as source-like text, which is
+      invaluable for debugging a parser.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>ast.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s2-ast">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s2-ast" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s2-ast">package main
+
+import (
+	"bytes"
+)
+
+// Node is the base interface every AST node implements.
+type Node interface {
+	TokenLiteral() string
+	String() string
+}
+
+// Statement nodes don't produce a value (let, return, expression-statement wrapper).
+type Statement interface {
+	Node
+	statementNode()
+}
+
+// Expression nodes produce a value (5, x, 5 + 5, etc).
+type Expression interface {
+	Node
+	expressionNode()
+}
+
+// Program is the root node of every AST our parser produces.
+type Program struct {
+	Statements []Statement
+}
+
+func (p *Program) TokenLiteral() string {
+	if len(p.Statements) > 0 {
+		return p.Statements[0].TokenLiteral()
+	}
+	return ""
+}
+
+func (p *Program) String() string {
+	var out bytes.Buffer
+	for _, s := range p.Statements {
+		out.WriteString(s.String())
+	}
+	return out.String()
+}
+
+// ---- Statements ----
+
+// LetStatement: let <Name> = <Value>;
+type LetStatement struct {
+	Token Token // the token.LET token
+	Name  *Identifier
+	Value Expression
+}
+
+func (ls *LetStatement) statementNode()       {}
+func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
+func (ls *LetStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(ls.TokenLiteral() + " ")
+	out.WriteString(ls.Name.String())
+	out.WriteString(" = ")
+	if ls.Value != nil {
+		out.WriteString(ls.Value.String())
+	}
+	out.WriteString(";")
+	return out.String()
+}
+
+// ReturnStatement: return <ReturnValue>;
+type ReturnStatement struct {
+	Token       Token // the token.RETURN token
+	ReturnValue Expression
+}
+
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
+func (rs *ReturnStatement) String() string {
+	var out bytes.Buffer
+	out.WriteString(rs.TokenLiteral() + " ")
+	if rs.ReturnValue != nil {
+		out.WriteString(rs.ReturnValue.String())
+	}
+	out.WriteString(";")
+	return out.String()
+}
+
+// ExpressionStatement wraps an expression so it can stand alone as a statement,
+// e.g. a bare "x + 5;" line at the top level.
+type ExpressionStatement struct {
+	Token      Token // the first token of the expression
+	Expression Expression
+}
+
+func (es *ExpressionStatement) statementNode()       {}
+func (es *ExpressionStatement) TokenLiteral() string { return es.Token.Literal }
+func (es *ExpressionStatement) String() string {
+	if es.Expression != nil {
+		return es.Expression.String()
+	}
+	return ""
+}
+
+// BlockStatement: { <statements> }
+type BlockStatement struct {
+	Token      Token // the { token
+	Statements []Statement
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+	for _, s := range bs.Statements {
+		out.WriteString(s.String())
+	}
+	return out.String()
+}
+
+// ---- Expressions ----
+
+// Identifier: x, foo, add
+type Identifier struct {
+	Token Token // the token.IDENT token
+	Value string
+}
+
+func (i *Identifier) expressionNode()      {}
+func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
+func (i *Identifier) String() string       { return i.Value }
+
+// IntegerLiteral: 5, 10, 12345
+type IntegerLiteral struct {
+	Token Token
+	Value int64
+}
+
+func (il *IntegerLiteral) expressionNode()      {}
+func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
+func (il *IntegerLiteral) String() string       { return il.Token.Literal }
+
+// PrefixExpression: <operator><right>, e.g. -5, !true
+type PrefixExpression struct {
+	Token    Token // the prefix token, e.g. !
+	Operator string
+	Right    Expression
+}
+
+func (pe *PrefixExpression) expressionNode()      {}
+func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
+func (pe *PrefixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(pe.Operator)
+	out.WriteString(pe.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+// InfixExpression: <left> <operator> <right>, e.g. 5 + 5
+type InfixExpression struct {
+	Token    Token // the operator token, e.g. +
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (ie *InfixExpression) expressionNode()      {}
+func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *InfixExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("(")
+	out.WriteString(ie.Left.String())
+	out.WriteString(" " + ie.Operator + " ")
+	out.WriteString(ie.Right.String())
+	out.WriteString(")")
+	return out.String()
+}
+
+// Boolean: true, false
+type Boolean struct {
+	Token Token
+	Value bool
+}
+
+func (b *Boolean) expressionNode()      {}
+func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
+func (b *Boolean) String() string       { return b.Token.Literal }</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Build the parser</h3></div>
+    <p>
+      Create <code>parser.go</code>. The <code>Parser</code> holds a current and a
+      peek token (exactly like the lexer held a current and a peek <em>character</em>),
+      plus two maps of parse functions keyed by token type.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>parser.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s2-parser">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s2-parser" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s2-parser">package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+// Precedence levels, lowest to highest.
+const (
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+)
+
+var precedences = map[TokenType]int{
+	EQ:       EQUALS,
+	NEQ:      EQUALS,
+	LT:       LESSGREATER,
+	GT:       LESSGREATER,
+	PLUS:     SUM,
+	MINUS:    SUM,
+	SLASH:    PRODUCT,
+	ASTERISK: PRODUCT,
+}
+
+type (
+	prefixParseFn func() Expression
+	infixParseFn  func(Expression) Expression
+)
+
+type Parser struct {
+	l      *Lexer
+	errors []string
+
+	curToken  Token
+	peekToken Token
+
+	prefixParseFns map[TokenType]prefixParseFn
+	infixParseFns  map[TokenType]infixParseFn
+}
+
+func NewParser(l *Lexer) *Parser {
+	p := &Parser{l: l, errors: []string{}}
+
+	p.prefixParseFns = make(map[TokenType]prefixParseFn)
+	p.registerPrefix(IDENT, p.parseIdentifier)
+	p.registerPrefix(INT, p.parseIntegerLiteral)
+	p.registerPrefix(BANG, p.parsePrefixExpression)
+	p.registerPrefix(MINUS, p.parsePrefixExpression)
+	p.registerPrefix(TRUE, p.parseBoolean)
+	p.registerPrefix(FALSE, p.parseBoolean)
+
+	p.infixParseFns = make(map[TokenType]infixParseFn)
+	p.registerInfix(PLUS, p.parseInfixExpression)
+	p.registerInfix(MINUS, p.parseInfixExpression)
+	p.registerInfix(SLASH, p.parseInfixExpression)
+	p.registerInfix(ASTERISK, p.parseInfixExpression)
+	p.registerInfix(EQ, p.parseInfixExpression)
+	p.registerInfix(NEQ, p.parseInfixExpression)
+	p.registerInfix(LT, p.parseInfixExpression)
+	p.registerInfix(GT, p.parseInfixExpression)
+
+	// read two tokens so curToken and peekToken are both set
+	p.nextToken()
+	p.nextToken()
+	return p
+}
+
+func (p *Parser) registerPrefix(tt TokenType, fn prefixParseFn) { p.prefixParseFns[tt] = fn }
+func (p *Parser) registerInfix(tt TokenType, fn infixParseFn)   { p.infixParseFns[tt] = fn }
+
+func (p *Parser) Errors() []string { return p.errors }
+
+func (p *Parser) nextToken() {
+	p.curToken = p.peekToken
+	p.peekToken = p.l.NextToken()
+}
+
+func (p *Parser) curTokenIs(t TokenType) bool  { return p.curToken.Type == t }
+func (p *Parser) peekTokenIs(t TokenType) bool { return p.peekToken.Type == t }
+
+func (p *Parser) expectPeek(t TokenType) bool {
+	if p.peekTokenIs(t) {
+		p.nextToken()
+		return true
+	}
+	p.peekError(t)
+	return false
+}
+
+func (p *Parser) peekError(t TokenType) {
+	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
+	p.errors = append(p.errors, msg)
+}
+
+func (p *Parser) peekPrecedence() int {
+	if pr, ok := precedences[p.peekToken.Type]; ok {
+		return pr
+	}
+	return LOWEST
+}
+
+func (p *Parser) curPrecedence() int {
+	if pr, ok := precedences[p.curToken.Type]; ok {
+		return pr
+	}
+	return LOWEST
+}
+
+func (p *Parser) ParseProgram() *Program {
+	program := &Program{Statements: []Statement{}}
+
+	for !p.curTokenIs(EOF) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			program.Statements = append(program.Statements, stmt)
+		}
+		p.nextToken()
+	}
+	return program
+}
+
+func (p *Parser) parseStatement() Statement {
+	switch p.curToken.Type {
+	case LET:
+		return p.parseLetStatement()
+	case RETURN:
+		return p.parseReturnStatement()
+	default:
+		return p.parseExpressionStatement()
+	}
+}
+
+func (p *Parser) parseLetStatement() Statement {
+	stmt := &LetStatement{Token: p.curToken}
+
+	if !p.expectPeek(IDENT) {
+		return nil
+	}
+	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(ASSIGN) {
+		return nil
+	}
+
+	p.nextToken()
+	stmt.Value = p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+}
+
+func (p *Parser) parseReturnStatement() Statement {
+	stmt := &ReturnStatement{Token: p.curToken}
+
+	p.nextToken()
+	stmt.ReturnValue = p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+}
+
+func (p *Parser) parseExpressionStatement() Statement {
+	stmt := &ExpressionStatement{Token: p.curToken}
+	stmt.Expression = p.parseExpression(LOWEST)
+
+	if p.peekTokenIs(SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+}
+
+// parseExpression is the heart of Pratt parsing: it looks up a prefix parser
+// for the current token, then keeps folding in infix operators as long as the
+// next operator binds tighter than `precedence`.
+func (p *Parser) parseExpression(precedence int) Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
+		p.errors = append(p.errors, fmt.Sprintf("no prefix parse function for %s found", p.curToken.Type))
+		return nil
+	}
+	leftExp := prefix()
+
+	for !p.peekTokenIs(SEMICOLON) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+		p.nextToken()
+		leftExp = infix(leftExp)
+	}
+	return leftExp
+}
+
+func (p *Parser) parseIdentifier() Expression {
+	return &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseIntegerLiteral() Expression {
+	lit := &IntegerLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	if err != nil {
+		p.errors = append(p.errors, fmt.Sprintf("could not parse %q as integer", p.curToken.Literal))
+		return nil
+	}
+	lit.Value = value
+	return lit
+}
+
+func (p *Parser) parseBoolean() Expression {
+	return &Boolean{Token: p.curToken, Value: p.curTokenIs(TRUE)}
+}
+
+func (p *Parser) parsePrefixExpression() Expression {
+	expr := &PrefixExpression{Token: p.curToken, Operator: p.curToken.Literal}
+	p.nextToken()
+	expr.Right = p.parseExpression(PREFIX)
+	return expr
+}
+
+func (p *Parser) parseInfixExpression(left Expression) Expression {
+	expr := &InfixExpression{Token: p.curToken, Operator: p.curToken.Literal, Left: left}
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expr.Right = p.parseExpression(precedence)
+	return expr
+}</script>
+
+    <div class="callout gotcha">
+      <span class="k">Common gotcha</span>
+      In <code>parseExpression</code>, the loop condition is
+      <code>precedence &lt; p.peekPrecedence()</code> — strictly less than.
+      If you write <code>&lt;=</code> by accident, operators of equal
+      precedence (like <code>+</code> and <code>-</code>) will parse
+      right-associatively instead of left-associatively, and
+      <code>10 - 3 - 2</code> will quietly evaluate to the wrong thing later.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Try it</h3></div>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s2-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s2-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s2-main">package main
+
+import "fmt"
+
+func main() {
+	inputs := []string{
+		"let x = 5;",
+		"let y = 10 * 2 + 3;",
+		"return x + y;",
+		"-5 + 10;",
+		"5 + 5 * 2 == 15;",
+		"!true == false;",
+	}
+
+	for _, input := range inputs {
+		l := NewLexer(input)
+		p := NewParser(l)
+		program := p.ParseProgram()
+
+		if len(p.Errors()) != 0 {
+			fmt.Printf("parser errors for %q: %v\n", input, p.Errors())
+			continue
+		}
+		fmt.Printf("%-30s => %s\n", input, program.String())
+	}
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+let x = 5;                     => let x = 5;
+let y = 10 * 2 + 3;            => let y = ((10 * 2) + 3);
+return x + y;                  => return (x + y);
+-5 + 10;                       => ((-5) + 10)
+5 + 5 * 2 == 15;               => ((5 + (5 * 2)) == 15)
+!true == false;                => ((!true) == false)</pre>
+    </div>
+    <p>
+      Look closely at <code>((10 * 2) + 3)</code> — the parentheses in the
+      printed output aren't from your source, they're <code>String()</code>
+      making the tree's actual shape visible. That's the precedence climbing
+      working correctly.
+    </p>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">%</span><h4>Exercise — parse the modulo operator</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">Give <code>%</code> the same precedence as <code>*</code> and <code>/</code>.</p>
+    <ol>
+      <li>Add <code>PERCENT: PRODUCT</code> to the <code>precedences</code> map.</li>
+      <li>Register it: <code>p.registerInfix(PERCENT, p.parseInfixExpression)</code> — you don't need a new parse function, the generic infix one already works.</li>
+      <li>Check that <code>10 + 3 % 2 * 4</code> prints as <code>(10 + ((3 % 2) * 4))</code>.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>parser.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex2-parser" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex2-parser">var precedences = map[TokenType]int{
+	EQ:       EQUALS,
+	NEQ:      EQUALS,
+	LT:       LESSGREATER,
+	GT:       LESSGREATER,
+	PLUS:     SUM,
+	MINUS:    SUM,
+	SLASH:    PRODUCT,
+	ASTERISK: PRODUCT,
+	PERCENT:  PRODUCT,
+}
+
+// in NewParser:
+p.registerInfix(PERCENT, p.parseInfixExpression)</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>  <span style="color:var(--text-dimmer)"># input: "10 + 3 % 2 * 4"</span>
+(10 + ((3 % 2) * 4))</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="s3" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 03</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>Parsing control flow and functions</h2>
+  <p class="lede">
+    With statements and arithmetic working, this session extends
+    <code>ast.go</code> and <code>parser.go</code> — the same two files from
+    Session 2 — to handle <code>if</code>/<code>else</code>, grouped
+    expressions, function literals, and function calls. No new files.
+  </p>
+
+  <ul class="obj-list">
+    <li>Add <code>IfExpression</code>, <code>FunctionLiteral</code>, and <code>CallExpression</code> nodes</li>
+    <li>Parse <code>(...)</code> grouping by reusing precedence, not a new AST node</li>
+    <li>Parse function literals and their parameter lists</li>
+    <li>Parse call expressions as an <em>infix</em> operator on <code>(</code></li>
+  </ul>
+
+  <div class="callout">
+    <span class="k">The key insight: calls are infix</span>
+    <code>add(1, 2)</code> looks like it starts with <code>add</code>, but
+    what actually matters to the parser is the <code>(</code> that follows
+    it — the same way <code>+</code> follows a left-hand side. So
+    <code>CallExpression</code> is parsed by registering <code>LPAREN</code>
+    as an <em>infix</em> parser with <code>CALL</code> precedence, higher than
+    everything else. The "left" side it receives is whatever expression was
+    being called.
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>Add three AST nodes</h3></div>
+    <p>Append these to the bottom of <code>ast.go</code>:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>ast.go</span><span class="tag edit">append</span></div>
+        <button class="copy-btn" data-copy="src-s3-ast-new">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s3-ast-new" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s3-ast-new">// IfExpression: if (<Condition>) <Consequence> else <Alternative>
+// Note: this is an *expression*, not a statement -- in our language "if" produces a value.
+type IfExpression struct {
+	Token       Token // the 'if' token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement
+}
+
+func (ie *IfExpression) expressionNode()      {}
+func (ie *IfExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *IfExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString("if")
+	out.WriteString(ie.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ie.Consequence.String())
+	if ie.Alternative != nil {
+		out.WriteString("else ")
+		out.WriteString(ie.Alternative.String())
+	}
+	return out.String()
+}
+
+// FunctionLiteral: fn(<Parameters>) <Body>
+type FunctionLiteral struct {
+	Token      Token // the 'fn' token
+	Parameters []*Identifier
+	Body       *BlockStatement
+}
+
+func (fl *FunctionLiteral) expressionNode()      {}
+func (fl *FunctionLiteral) TokenLiteral() string { return fl.Token.Literal }
+func (fl *FunctionLiteral) String() string {
+	var out bytes.Buffer
+	params := []string{}
+	for _, p := range fl.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString(fl.TokenLiteral())
+	out.WriteString("(")
+	for i, p := range params {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString(p)
+	}
+	out.WriteString(") ")
+	out.WriteString(fl.Body.String())
+	return out.String()
+}
+
+// CallExpression: <Function>(<Arguments>)
+type CallExpression struct {
+	Token     Token // the '(' token
+	Function  Expression
+	Arguments []Expression
+}
+
+func (ce *CallExpression) expressionNode()      {}
+func (ce *CallExpression) TokenLiteral() string { return ce.Token.Literal }
+func (ce *CallExpression) String() string {
+	var out bytes.Buffer
+	args := []string{}
+	for _, a := range ce.Arguments {
+		args = append(args, a.String())
+	}
+	out.WriteString(ce.Function.String())
+	out.WriteString("(")
+	for i, a := range args {
+		if i > 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString(a)
+	}
+	out.WriteString(")")
+	return out.String()
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Add a CALL precedence level</h3></div>
+    <p>In <code>parser.go</code>, add <code>CALL</code> as the highest precedence and give <code>(</code> that precedence:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>parser.go</span><span class="tag edit">edit</span></div>
+        <button class="copy-btn" data-copy="src-s3-parser-prec">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s3-parser-prec" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s3-parser-prec">// Precedence levels, lowest to highest.
+const (
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+	CALL        // myFunction(X)
+)
+
+var precedences = map[TokenType]int{
+	EQ:       EQUALS,
+	NEQ:      EQUALS,
+	LT:       LESSGREATER,
+	GT:       LESSGREATER,
+	PLUS:     SUM,
+	MINUS:    SUM,
+	SLASH:    PRODUCT,
+	ASTERISK: PRODUCT,
+	LPAREN:   CALL,
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Register the new parse functions</h3></div>
+    <p>Still in <code>NewParser</code>, register a prefix parser for <code>(</code>, <code>if</code>, and <code>fn</code>, and an infix parser for <code>(</code> (that's the call-expression trick above):</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>parser.go</span><span class="tag edit">edit</span></div>
+        <button class="copy-btn" data-copy="src-s3-parser-reg">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s3-parser-reg" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s3-parser-reg">	p.prefixParseFns = make(map[TokenType]prefixParseFn)
+	p.registerPrefix(IDENT, p.parseIdentifier)
+	p.registerPrefix(INT, p.parseIntegerLiteral)
+	p.registerPrefix(BANG, p.parsePrefixExpression)
+	p.registerPrefix(MINUS, p.parsePrefixExpression)
+	p.registerPrefix(TRUE, p.parseBoolean)
+	p.registerPrefix(FALSE, p.parseBoolean)
+	p.registerPrefix(LPAREN, p.parseGroupedExpression)
+	p.registerPrefix(IF, p.parseIfExpression)
+	p.registerPrefix(FUNCTION, p.parseFunctionLiteral)
+
+	p.infixParseFns = make(map[TokenType]infixParseFn)
+	p.registerInfix(PLUS, p.parseInfixExpression)
+	p.registerInfix(MINUS, p.parseInfixExpression)
+	p.registerInfix(SLASH, p.parseInfixExpression)
+	p.registerInfix(ASTERISK, p.parseInfixExpression)
+	p.registerInfix(EQ, p.parseInfixExpression)
+	p.registerInfix(NEQ, p.parseInfixExpression)
+	p.registerInfix(LT, p.parseInfixExpression)
+	p.registerInfix(GT, p.parseInfixExpression)
+	p.registerInfix(LPAREN, p.parseCallExpression)</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 4</span><h3>Write the parse functions</h3></div>
+    <p>Append these to <code>parser.go</code>. <code>parseBlockStatement</code> is shared by both <code>if</code> bodies and function bodies:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>parser.go</span><span class="tag edit">append</span></div>
+        <button class="copy-btn" data-copy="src-s3-parser-new">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s3-parser-new" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s3-parser-new">// parseGroupedExpression handles "(" <expr> ")" -- it doesn't build its own AST
+// node, it just lets parentheses control precedence during parsing.
+func (p *Parser) parseGroupedExpression() Expression {
+	p.nextToken()
+	exp := p.parseExpression(LOWEST)
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+	return exp
+}
+
+func (p *Parser) parseBlockStatement() *BlockStatement {
+	block := &BlockStatement{Token: p.curToken}
+	block.Statements = []Statement{}
+
+	p.nextToken()
+
+	for !p.curTokenIs(RBRACE) && !p.curTokenIs(EOF) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+		p.nextToken()
+	}
+	return block
+}
+
+func (p *Parser) parseIfExpression() Expression {
+	expr := &IfExpression{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+	p.nextToken()
+	expr.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	expr.Consequence = p.parseBlockStatement()
+
+	if p.peekTokenIs(ELSE) {
+		p.nextToken()
+		if !p.expectPeek(LBRACE) {
+			return nil
+		}
+		expr.Alternative = p.parseBlockStatement()
+	}
+	return expr
+}
+
+func (p *Parser) parseFunctionLiteral() Expression {
+	lit := &FunctionLiteral{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+	lit.Parameters = p.parseFunctionParameters()
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	lit.Body = p.parseBlockStatement()
+	return lit
+}
+
+func (p *Parser) parseFunctionParameters() []*Identifier {
+	identifiers := []*Identifier{}
+
+	if p.peekTokenIs(RPAREN) {
+		p.nextToken()
+		return identifiers
+	}
+
+	p.nextToken()
+	identifiers = append(identifiers, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+
+	for p.peekTokenIs(COMMA) {
+		p.nextToken()
+		p.nextToken()
+		identifiers = append(identifiers, &Identifier{Token: p.curToken, Value: p.curToken.Literal})
+	}
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+	return identifiers
+}
+
+func (p *Parser) parseCallExpression(function Expression) Expression {
+	expr := &CallExpression{Token: p.curToken, Function: function}
+	expr.Arguments = p.parseCallArguments()
+	return expr
+}
+
+func (p *Parser) parseCallArguments() []Expression {
+	args := []Expression{}
+
+	if p.peekTokenIs(RPAREN) {
+		p.nextToken()
+		return args
+	}
+
+	p.nextToken()
+	args = append(args, p.parseExpression(LOWEST))
+
+	for p.peekTokenIs(COMMA) {
+		p.nextToken()
+		p.nextToken()
+		args = append(args, p.parseExpression(LOWEST))
+	}
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+	return args
+}</script>
+
+    <div class="callout warn">
+      <span class="k">Watch the operand order</span>
+      <code>parseIfExpression</code> expects <code>(</code> immediately after
+      <code>if</code>, then a condition, then <code>)</code>, then
+      <code>{</code>. Each of those is a call to <code>expectPeek</code>,
+      which both checks the token <em>and</em> advances past it — get the
+      order wrong and you'll get a confusing "expected next token" error
+      pointing at the wrong place.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 5</span><h3>Try it</h3></div>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag edit">replace</span></div>
+        <button class="copy-btn" data-copy="src-s3-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s3-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s3-main">package main
+
+import "fmt"
+
+func main() {
+	inputs := []string{
+		"if (x < y) { x } else { y }",
+		"fn(x, y) { x + y; }",
+		"let add = fn(x, y) { return x + y; }; add(2, 3 * 4);",
+		"(5 + 5) * 2",
+		"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+	}
+
+	for _, input := range inputs {
+		l := NewLexer(input)
+		p := NewParser(l)
+		program := p.ParseProgram()
+
+		if len(p.Errors()) != 0 {
+			fmt.Printf("parser errors for %q: %v\n", input, p.Errors())
+			continue
+		}
+		fmt.Printf("%-55s => %s\n", input, program.String())
+	}
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+if (x < y) { x } else { y }                             => if(x < y) xelse y
+fn(x, y) { x + y; }                                     => fn(x, y) (x + y)
+let add = fn(x, y) { return x + y; }; add(2, 3 * 4);    => let add = fn(x, y) return (x + y);;add(2, (3 * 4))
+(5 + 5) * 2                                             => ((5 + 5) * 2)
+add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))               => add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))</pre>
+    </div>
+    <p>
+      The squashed-together spacing in that output (<code>xelse</code>,
+      <code>fn(x, y) return</code>) is just <code>String()</code> being a
+      minimal debug view, not real syntax — the tree structure underneath is
+      correct, which is what actually matters here.
+    </p>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">?</span><h4>Exercise — support <code>else if</code> chains</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">
+      Right now, <code>else</code> must be followed immediately by
+      <code>{</code>. Extend <code>parseIfExpression</code> so
+      <code>else if (...) {...}</code> works without extra braces.
+    </p>
+    <ol>
+      <li>After consuming <code>else</code>, check whether the next token is <code>IF</code> instead of <code>{</code>.</li>
+      <li>If it is, recursively call <code>parseIfExpression</code> and wrap the result in a one-statement <code>BlockStatement</code> so it still fits in <code>Alternative *BlockStatement</code>.</li>
+      <li>Test: <code>if (x &lt; 0) { 1 } else if (x == 0) { 2 } else { 3 }</code> should parse without errors.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>parser.go</span><span class="tag edit">edit — inside parseIfExpression</span></div></div>
+          <pre class="code-block"><code id="code-ex3-parser" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex3-parser">if p.peekTokenIs(ELSE) {
+	p.nextToken()
+
+	// "else if (...) {...}" -- if the token right after `else` is another
+	// `if`, parse a nested if-expression instead of demanding a block.
+	if p.peekTokenIs(IF) {
+		p.nextToken()
+		alt := p.parseIfExpression()
+		ifExpr, ok := alt.(*IfExpression)
+		if !ok {
+			return nil
+		}
+		expr.Alternative = &BlockStatement{
+			Token:      p.curToken,
+			Statements: []Statement{&ExpressionStatement{Token: p.curToken, Expression: ifExpr}},
+		}
+		return expr
+	}
+
+	if !p.expectPeek(LBRACE) {
+		return nil
+	}
+	expr.Alternative = p.parseBlockStatement()
+}</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>  <span style="color:var(--text-dimmer)"># input: if (x < 0) { 1 } else if (x == 0) { 2 } else { 3 }</span>
+if(x < 0) 1else if(x == 0) 2else 3</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="s4" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 04</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>Making it actually run: the evaluator</h2>
+  <p class="lede">
+    Parsing gives you a tree; it doesn't give you an answer. This session
+    introduces two new files — <code>object.go</code> for representing
+    runtime values, and <code>evaluator.go</code> for walking the tree and
+    producing them. This is where Nuru becomes a real interpreter.
+  </p>
+
+  <ul class="obj-list">
+    <li>Design an <code>Object</code> interface for runtime values (integers, booleans, null)</li>
+    <li>Write <code>Eval</code> as a big type-switch over AST nodes</li>
+    <li>Handle <code>return</code> by wrapping values so they can "bubble up" through nested blocks</li>
+    <li>Turn runtime problems (like <code>5 + true</code>) into proper error values instead of Go panics</li>
+  </ul>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>Define the object system</h3></div>
+    <p>
+      Create <code>object.go</code>. Every value Nuru produces at runtime
+      implements <code>Object</code>. We reuse single shared instances for
+      <code>true</code>, <code>false</code>, and <code>null</code> — there's
+      no reason to allocate a new one every time, and it lets the evaluator
+      compare booleans by pointer later.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>object.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s4-object">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s4-object" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s4-object">package main
+
+import "fmt"
+
+type ObjectType string
+
+const (
+	INTEGER_OBJ      = "INTEGER"
+	BOOLEAN_OBJ      = "BOOLEAN"
+	NULL_OBJ         = "NULL"
+	RETURN_VALUE_OBJ = "RETURN_VALUE"
+	ERROR_OBJ        = "ERROR"
+)
+
+// Object is the interface every value produced by evaluation implements.
+type Object interface {
+	Type() ObjectType
+	Inspect() string
+}
+
+type Integer struct {
+	Value int64
+}
+
+func (i *Integer) Type() ObjectType { return INTEGER_OBJ }
+func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
+
+type Boolean_ struct {
+	Value bool
+}
+
+func (b *Boolean_) Type() ObjectType { return BOOLEAN_OBJ }
+func (b *Boolean_) Inspect() string  { return fmt.Sprintf("%t", b.Value) }
+
+type Null struct{}
+
+func (n *Null) Type() ObjectType { return NULL_OBJ }
+func (n *Null) Inspect() string  { return "null" }
+
+// ReturnValue wraps a value produced by a `return` statement so the evaluator
+// can tell it apart from an ordinary value while unwinding a block.
+type ReturnValue struct {
+	Value Object
+}
+
+func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
+func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
+
+// Error represents a runtime error, e.g. "type mismatch: INTEGER + BOOLEAN".
+type Error struct {
+	Message string
+}
+
+func (e *Error) Type() ObjectType { return ERROR_OBJ }
+func (e *Error) Inspect() string  { return "ERROR: " + e.Message }
+
+// We reuse single shared instances for true, false, and null since there's
+// no need to allocate a new one every time -- this also lets us compare
+// booleans by pointer equality in the evaluator.
+var (
+	TRUE_OBJ  = &Boolean_{Value: true}
+	FALSE_OBJ = &Boolean_{Value: false}
+	NULL      = &Null{}
+)</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Write the evaluator</h3></div>
+    <p>
+      Create <code>evaluator.go</code>. <code>Eval</code> recognizes each AST
+      node type and knows how to turn it into an <code>Object</code>. The two
+      trickiest parts are <code>return</code> unwinding and error propagation
+      — both are handled by giving <code>ReturnValue</code> and
+      <code>Error</code> their own object types that the block-evaluation
+      loop specifically checks for.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>evaluator.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s4-evaluator">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s4-evaluator" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s4-evaluator">package main
+
+import "fmt"
+
+func Eval(node Node) Object {
+	switch node := node.(type) {
+
+	case *Program:
+		return evalProgram(node)
+
+	case *ExpressionStatement:
+		return Eval(node.Expression)
+
+	case *BlockStatement:
+		return evalBlockStatement(node)
+
+	case *ReturnStatement:
+		val := Eval(node.ReturnValue)
+		if isError(val) {
+			return val
+		}
+		return &ReturnValue{Value: val}
+
+	case *IntegerLiteral:
+		return &Integer{Value: node.Value}
+
+	case *Boolean:
+		return nativeBoolToBooleanObject(node.Value)
+
+	case *PrefixExpression:
+		right := Eval(node.Right)
+		if isError(right) {
+			return right
+		}
+		return evalPrefixExpression(node.Operator, right)
+
+	case *InfixExpression:
+		left := Eval(node.Left)
+		if isError(left) {
+			return left
+		}
+		right := Eval(node.Right)
+		if isError(right) {
+			return right
+		}
+		return evalInfixExpression(node.Operator, left, right)
+
+	case *IfExpression:
+		return evalIfExpression(node)
+	}
+
+	return nil
+}
+
+func evalProgram(program *Program) Object {
+	var result Object
+
+	for _, stmt := range program.Statements {
+		result = Eval(stmt)
+
+		switch result := result.(type) {
+		case *ReturnValue:
+			return result.Value // unwrap: a return at the top level ends the program
+		case *Error:
+			return result
+		}
+	}
+	return result
+}
+
+// evalBlockStatement deliberately does NOT unwrap ReturnValue -- it needs to
+// keep bubbling up through nested blocks until evalProgram (or a function
+// call, added in the next session) catches it.
+func evalBlockStatement(block *BlockStatement) Object {
+	var result Object
+
+	for _, stmt := range block.Statements {
+		result = Eval(stmt)
+
+		if result != nil {
+			rt := result.Type()
+			if rt == RETURN_VALUE_OBJ || rt == ERROR_OBJ {
+				return result
+			}
+		}
+	}
+	return result
+}
+
+func nativeBoolToBooleanObject(input bool) *Boolean_ {
+	if input {
+		return TRUE_OBJ
+	}
+	return FALSE_OBJ
+}
+
+func evalPrefixExpression(operator string, right Object) Object {
+	switch operator {
+	case "!":
+		return evalBangOperatorExpression(right)
+	case "-":
+		return evalMinusPrefixOperatorExpression(right)
+	default:
+		return newError("unknown operator: %s%s", operator, right.Type())
+	}
+}
+
+func evalBangOperatorExpression(right Object) Object {
+	switch right {
+	case TRUE_OBJ:
+		return FALSE_OBJ
+	case FALSE_OBJ:
+		return TRUE_OBJ
+	case NULL:
+		return TRUE_OBJ
+	default:
+		return FALSE_OBJ
+	}
+}
+
+func evalMinusPrefixOperatorExpression(right Object) Object {
+	if right.Type() != INTEGER_OBJ {
+		return newError("unknown operator: -%s", right.Type())
+	}
+	value := right.(*Integer).Value
+	return &Integer{Value: -value}
+}
+
+func evalInfixExpression(operator string, left, right Object) Object {
+	switch {
+	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
+		return evalIntegerInfixExpression(operator, left, right)
+	case operator == "==":
+		return nativeBoolToBooleanObject(left == right)
+	case operator == "!=":
+		return nativeBoolToBooleanObject(left != right)
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalIntegerInfixExpression(operator string, left, right Object) Object {
+	leftVal := left.(*Integer).Value
+	rightVal := right.(*Integer).Value
+
+	switch operator {
+	case "+":
+		return &Integer{Value: leftVal + rightVal}
+	case "-":
+		return &Integer{Value: leftVal - rightVal}
+	case "*":
+		return &Integer{Value: leftVal * rightVal}
+	case "/":
+		return &Integer{Value: leftVal / rightVal}
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalIfExpression(ie *IfExpression) Object {
+	condition := Eval(ie.Condition)
+	if isError(condition) {
+		return condition
+	}
+
+	if isTruthy(condition) {
+		return Eval(ie.Consequence)
+	} else if ie.Alternative != nil {
+		return Eval(ie.Alternative)
+	}
+	return NULL
+}
+
+func isTruthy(obj Object) bool {
+	switch obj {
+	case NULL:
+		return false
+	case TRUE_OBJ:
+		return true
+	case FALSE_OBJ:
+		return false
+	default:
+		return true
+	}
+}
+
+func isError(obj Object) bool {
+	if obj != nil {
+		return obj.Type() == ERROR_OBJ
+	}
+	return false
+}
+
+func newError(format string, a ...interface{}) *Error {
+	return &Error{Message: fmt.Sprintf(format, a...)}
+}</script>
+
+    <div class="callout">
+      <span class="k">Why evalBlockStatement doesn't unwrap ReturnValue</span>
+      <code>evalProgram</code> unwraps a <code>ReturnValue</code> because a
+      return at the top level ends everything. But
+      <code>evalBlockStatement</code> deliberately leaves it wrapped — a
+      <code>return</code> inside a nested <code>if</code> needs to keep
+      bubbling up through each enclosing block until it reaches the top (or,
+      from Session 5 onward, a function call). If the inner block unwrapped
+      it early, an early <code>return</code> inside an <code>if</code> would
+      only exit the <code>if</code>, not the whole function.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Try it</h3></div>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag edit">replace</span></div>
+        <button class="copy-btn" data-copy="src-s4-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s4-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s4-main">package main
+
+import "fmt"
+
+func main() {
+	inputs := []string{
+		"5 + 5 * 2",
+		"(5 + 10 * 2 + 15 / 3) * 2 + -10",
+		"true == (1 < 2)",
+		"if (5 * 5 + 10 > 34) { 99 } else { 100 }",
+		"9; return 2 * 5; 9;",
+		"if (10 > 1) { if (10 > 1) { return 10; } return 1; }",
+		"5 + true;",
+		"-true",
+	}
+
+	for _, input := range inputs {
+		l := NewLexer(input)
+		p := NewParser(l)
+		program := p.ParseProgram()
+
+		if len(p.Errors()) != 0 {
+			fmt.Printf("parser errors for %q: %v\n", input, p.Errors())
+			continue
+		}
+
+		result := Eval(program)
+		if result == nil {
+			fmt.Printf("%-45s => <nil>\n", input)
+			continue
+		}
+		fmt.Printf("%-45s => %s\n", input, result.Inspect())
+	}
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+5 + 5 * 2                                     => 15
+(5 + 10 * 2 + 15 / 3) * 2 + -10               => 50
+true == (1 < 2)                               => true
+if (5 * 5 + 10 > 34) { 99 } else { 100 }      => 99
+9; return 2 * 5; 9;                           => 10
+if (10 > 1) { if (10 > 1) { return 10; } return 1; } => 10
+5 + true;                                     => ERROR: type mismatch: INTEGER + BOOLEAN
+-true                                         => ERROR: unknown operator: -BOOLEAN</pre>
+    </div>
+  </div>
+
+  <div class="checkpoint">
+    <span class="mark">✓</span>
+    <div><b>Checkpoint.</b> The nested-return example — <code>if (10 &gt; 1) { if (10 &gt; 1) { return 10; } return 1; }</code> — is the one to stare at if anything feels off. It should print <code>10</code>, proving the return value crossed two levels of nested blocks without being swallowed.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">%</span><h4>Exercise — evaluate the modulo operator</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">
+      You can already <em>parse</em> <code>%</code> from Session 2's
+      exercise. Now make it actually compute something.
+    </p>
+    <ol>
+      <li>In <code>evalIntegerInfixExpression</code>, add a <code>case "%"</code> that computes <code>leftVal % rightVal</code>.</li>
+      <li>Check <code>10 % 3</code> evaluates to <code>1</code>, and <code>17 % 5 == 2</code> evaluates to <code>true</code>.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>evaluator.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex4-eval" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex4-eval">case "/":
+	return &Integer{Value: leftVal / rightVal}
+case "%":
+	return &Integer{Value: leftVal % rightVal}</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>
+10 % 3 => 1
+17 % 5 == 2 => true
+(10 + 5) % 4 => 3</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="s5" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 05</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>Variables, function calls, and closures</h2>
+  <p class="lede">
+    The evaluator from Session 4 can compute expressions, but it has nowhere
+    to put a variable. This session adds a new file, <code>environment.go</code>,
+    and threads it through every <code>Eval</code> call — which is also what
+    finally makes function calls, and closures, possible.
+  </p>
+
+  <ul class="obj-list">
+    <li>Build an <code>Environment</code> that maps names to values, chained to an outer scope</li>
+    <li>Evaluate <code>let</code> statements and identifier lookups</li>
+    <li>Evaluate function literals and calls — and see exactly where closures come from</li>
+  </ul>
+
+  <div class="callout">
+    <span class="k">Where closures actually come from</span>
+    A <code>Function</code> object doesn't just store its parameters and
+    body — it stores the <code>*Environment</code> that was active
+    <em>when it was defined</em>. Every time you call it, we create a new
+    environment for the call's local variables, but chain it to that
+    captured one. That chain is the entire mechanism behind closures; there's
+    no separate "closure" feature to build.
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>Build the environment</h3></div>
+    <p>Create <code>environment.go</code>:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>environment.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s5-env">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s5-env" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s5-env">package main
+
+// Environment maps identifier names to the objects they're bound to. Each
+// function call gets its own Environment, chained to the one it was defined
+// in via `outer` -- that chain is what gives us closures.
+type Environment struct {
+	store map[string]Object
+	outer *Environment
+}
+
+func NewEnvironment() *Environment {
+	return &Environment{store: make(map[string]Object)}
+}
+
+// NewEnclosedEnvironment creates a new scope nested inside `outer`, used when
+// we call a function: the function body's environment can see the caller's
+// bindings (well, technically the bindings present when the function was
+// *defined*) but the caller can't see into the function.
+func NewEnclosedEnvironment(outer *Environment) *Environment {
+	env := NewEnvironment()
+	env.outer = outer
+	return env
+}
+
+func (e *Environment) Get(name string) (Object, bool) {
+	obj, ok := e.store[name]
+	if !ok && e.outer != nil {
+		obj, ok = e.outer.Get(name)
+	}
+	return obj, ok
+}
+
+func (e *Environment) Set(name string, val Object) Object {
+	e.store[name] = val
+	return val
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Add a Function object</h3></div>
+    <p>In <code>object.go</code>, add a <code>FUNCTION_OBJ</code> constant and a <code>Function</code> type, and update the imports at the top:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>object.go</span><span class="tag edit">edit + append</span></div>
+        <button class="copy-btn" data-copy="src-s5-object">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s5-object" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s5-object">package main
+
+import (
+	"bytes"
+	"fmt"
+	"strings"
+)
+
+type ObjectType string
+
+const (
+	INTEGER_OBJ      = "INTEGER"
+	BOOLEAN_OBJ      = "BOOLEAN"
+	NULL_OBJ         = "NULL"
+	RETURN_VALUE_OBJ = "RETURN_VALUE"
+	ERROR_OBJ        = "ERROR"
+	FUNCTION_OBJ     = "FUNCTION"
+)
+
+// Object is the interface every value produced by evaluation implements.
+type Object interface {
+	Type() ObjectType
+	Inspect() string
+}
+
+type Integer struct {
+	Value int64
+}
+
+func (i *Integer) Type() ObjectType { return INTEGER_OBJ }
+func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
+
+type Boolean_ struct {
+	Value bool
+}
+
+func (b *Boolean_) Type() ObjectType { return BOOLEAN_OBJ }
+func (b *Boolean_) Inspect() string  { return fmt.Sprintf("%t", b.Value) }
+
+type Null struct{}
+
+func (n *Null) Type() ObjectType { return NULL_OBJ }
+func (n *Null) Inspect() string  { return "null" }
+
+// ReturnValue wraps a value produced by a `return` statement so the evaluator
+// can tell it apart from an ordinary value while unwinding a block.
+type ReturnValue struct {
+	Value Object
+}
+
+func (rv *ReturnValue) Type() ObjectType { return RETURN_VALUE_OBJ }
+func (rv *ReturnValue) Inspect() string  { return rv.Value.Inspect() }
+
+// Error represents a runtime error, e.g. "type mismatch: INTEGER + BOOLEAN".
+type Error struct {
+	Message string
+}
+
+func (e *Error) Type() ObjectType { return ERROR_OBJ }
+func (e *Error) Inspect() string  { return "ERROR: " + e.Message }
+
+// We reuse single shared instances for true, false, and null since there's
+// no need to allocate a new one every time -- this also lets us compare
+// booleans by pointer equality in the evaluator.
+var (
+	TRUE_OBJ  = &Boolean_{Value: true}
+	FALSE_OBJ = &Boolean_{Value: false}
+	NULL      = &Null{}
+)
+
+// Function is a first-class value: it carries its parameters, its body, and
+// (crucially) the environment it was *defined* in, which is what makes
+// closures work.
+type Function struct {
+	Parameters []*Identifier
+	Body       *BlockStatement
+	Env        *Environment
+}
+
+func (f *Function) Type() ObjectType { return FUNCTION_OBJ }
+func (f *Function) Inspect() string {
+	var out bytes.Buffer
+	params := []string{}
+	for _, p := range f.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString("fn(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") {\n")
+	out.WriteString(f.Body.String())
+	out.WriteString("\n}")
+	return out.String()
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Thread the environment through Eval</h3></div>
+    <p>
+      This is the one big rewrite in the whole workshop: <code>Eval</code>
+      and nearly every helper function it calls now take an
+      <code>*Environment</code> parameter. It's mechanical but touches a lot
+      of lines, so here's the complete, updated <code>evaluator.go</code>
+      to replace your Session 4 version with:
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>evaluator.go</span><span class="tag edit">full replace</span></div>
+        <button class="copy-btn" data-copy="src-s5-evaluator">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s5-evaluator" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s5-evaluator">package main
+
+import "fmt"
+
+func Eval(node Node, env *Environment) Object {
+	switch node := node.(type) {
+
+	case *Program:
+		return evalProgram(node, env)
+
+	case *ExpressionStatement:
+		return Eval(node.Expression, env)
+
+	case *BlockStatement:
+		return evalBlockStatement(node, env)
+
+	case *ReturnStatement:
+		val := Eval(node.ReturnValue, env)
+		if isError(val) {
+			return val
+		}
+		return &ReturnValue{Value: val}
+
+	case *LetStatement:
+		val := Eval(node.Value, env)
+		if isError(val) {
+			return val
+		}
+		env.Set(node.Name.Value, val)
+		return val
+
+	case *Identifier:
+		return evalIdentifier(node, env)
+
+	case *IntegerLiteral:
+		return &Integer{Value: node.Value}
+
+	case *Boolean:
+		return nativeBoolToBooleanObject(node.Value)
+
+	case *PrefixExpression:
+		right := Eval(node.Right, env)
+		if isError(right) {
+			return right
+		}
+		return evalPrefixExpression(node.Operator, right)
+
+	case *InfixExpression:
+		left := Eval(node.Left, env)
+		if isError(left) {
+			return left
+		}
+		right := Eval(node.Right, env)
+		if isError(right) {
+			return right
+		}
+		return evalInfixExpression(node.Operator, left, right)
+
+	case *IfExpression:
+		return evalIfExpression(node, env)
+
+	case *FunctionLiteral:
+		return &Function{Parameters: node.Parameters, Body: node.Body, Env: env}
+
+	case *CallExpression:
+		function := Eval(node.Function, env)
+		if isError(function) {
+			return function
+		}
+		args := evalExpressions(node.Arguments, env)
+		if len(args) == 1 && isError(args[0]) {
+			return args[0]
+		}
+		return applyFunction(function, args)
+	}
+
+	return nil
+}
+
+func evalExpressions(exps []Expression, env *Environment) []Object {
+	var result []Object
+
+	for _, e := range exps {
+		evaluated := Eval(e, env)
+		if isError(evaluated) {
+			return []Object{evaluated}
+		}
+		result = append(result, evaluated)
+	}
+	return result
+}
+
+func applyFunction(fn Object, args []Object) Object {
+	function, ok := fn.(*Function)
+	if !ok {
+		return newError("not a function: %s", fn.Type())
+	}
+
+	extendedEnv := extendFunctionEnv(function, args)
+	evaluated := Eval(function.Body, extendedEnv)
+	return unwrapReturnValue(evaluated)
+}
+
+func extendFunctionEnv(fn *Function, args []Object) *Environment {
+	env := NewEnclosedEnvironment(fn.Env)
+	for paramIdx, param := range fn.Parameters {
+		if paramIdx < len(args) {
+			env.Set(param.Value, args[paramIdx])
+		}
+	}
+	return env
+}
+
+// unwrapReturnValue prevents a `return` inside a function body from
+// bubbling past the function call and stopping evaluation of the caller too.
+func unwrapReturnValue(obj Object) Object {
+	if returnValue, ok := obj.(*ReturnValue); ok {
+		return returnValue.Value
+	}
+	return obj
+}
+
+func evalIdentifier(node *Identifier, env *Environment) Object {
+	if val, ok := env.Get(node.Value); ok {
+		return val
+	}
+	return newError("identifier not found: " + node.Value)
+}
+
+func evalProgram(program *Program, env *Environment) Object {
+	var result Object
+
+	for _, stmt := range program.Statements {
+		result = Eval(stmt, env)
+
+		switch result := result.(type) {
+		case *ReturnValue:
+			return result.Value // unwrap: a return at the top level ends the program
+		case *Error:
+			return result
+		}
+	}
+	return result
+}
+
+// evalBlockStatement deliberately does NOT unwrap ReturnValue -- it needs to
+// keep bubbling up through nested blocks until evalProgram or applyFunction
+// catches it.
+func evalBlockStatement(block *BlockStatement, env *Environment) Object {
+	var result Object
+
+	for _, stmt := range block.Statements {
+		result = Eval(stmt, env)
+
+		if result != nil {
+			rt := result.Type()
+			if rt == RETURN_VALUE_OBJ || rt == ERROR_OBJ {
+				return result
+			}
+		}
+	}
+	return result
+}
+
+func nativeBoolToBooleanObject(input bool) *Boolean_ {
+	if input {
+		return TRUE_OBJ
+	}
+	return FALSE_OBJ
+}
+
+func evalPrefixExpression(operator string, right Object) Object {
+	switch operator {
+	case "!":
+		return evalBangOperatorExpression(right)
+	case "-":
+		return evalMinusPrefixOperatorExpression(right)
+	default:
+		return newError("unknown operator: %s%s", operator, right.Type())
+	}
+}
+
+func evalBangOperatorExpression(right Object) Object {
+	switch right {
+	case TRUE_OBJ:
+		return FALSE_OBJ
+	case FALSE_OBJ:
+		return TRUE_OBJ
+	case NULL:
+		return TRUE_OBJ
+	default:
+		return FALSE_OBJ
+	}
+}
+
+func evalMinusPrefixOperatorExpression(right Object) Object {
+	if right.Type() != INTEGER_OBJ {
+		return newError("unknown operator: -%s", right.Type())
+	}
+	value := right.(*Integer).Value
+	return &Integer{Value: -value}
+}
+
+func evalInfixExpression(operator string, left, right Object) Object {
+	switch {
+	case left.Type() == INTEGER_OBJ && right.Type() == INTEGER_OBJ:
+		return evalIntegerInfixExpression(operator, left, right)
+	case operator == "==":
+		return nativeBoolToBooleanObject(left == right)
+	case operator == "!=":
+		return nativeBoolToBooleanObject(left != right)
+	case left.Type() != right.Type():
+		return newError("type mismatch: %s %s %s", left.Type(), operator, right.Type())
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalIntegerInfixExpression(operator string, left, right Object) Object {
+	leftVal := left.(*Integer).Value
+	rightVal := right.(*Integer).Value
+
+	switch operator {
+	case "+":
+		return &Integer{Value: leftVal + rightVal}
+	case "-":
+		return &Integer{Value: leftVal - rightVal}
+	case "*":
+		return &Integer{Value: leftVal * rightVal}
+	case "/":
+		return &Integer{Value: leftVal / rightVal}
+	case "<":
+		return nativeBoolToBooleanObject(leftVal < rightVal)
+	case ">":
+		return nativeBoolToBooleanObject(leftVal > rightVal)
+	case "==":
+		return nativeBoolToBooleanObject(leftVal == rightVal)
+	case "!=":
+		return nativeBoolToBooleanObject(leftVal != rightVal)
+	default:
+		return newError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+}
+
+func evalIfExpression(ie *IfExpression, env *Environment) Object {
+	condition := Eval(ie.Condition, env)
+	if isError(condition) {
+		return condition
+	}
+
+	if isTruthy(condition) {
+		return Eval(ie.Consequence, env)
+	} else if ie.Alternative != nil {
+		return Eval(ie.Alternative, env)
+	}
+	return NULL
+}
+
+func isTruthy(obj Object) bool {
+	switch obj {
+	case NULL:
+		return false
+	case TRUE_OBJ:
+		return true
+	case FALSE_OBJ:
+		return false
+	default:
+		return true
+	}
+}
+
+func isError(obj Object) bool {
+	if obj != nil {
+		return obj.Type() == ERROR_OBJ
+	}
+	return false
+}
+
+func newError(format string, a ...interface{}) *Error {
+	return &Error{Message: fmt.Sprintf(format, a...)}
+}</script>
+
+    <div class="callout">
+      <span class="k">Reading applyFunction closely</span>
+      <code>extendFunctionEnv</code> creates a new environment chained to
+      <code>fn.Env</code> — not to whatever environment the <em>call site</em>
+      happens to be in. That's deliberate: it's what gives you lexical
+      scoping (a function sees the variables that were visible where it was
+      <em>written</em>) instead of dynamic scoping (where it would see the
+      caller's variables). <code>unwrapReturnValue</code> then does the
+      opposite job of Session 4's <code>evalBlockStatement</code>: it stops a
+      <code>return</code> from bubbling any further once it's escaped the
+      function it belongs to.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 4</span><h3>Try it</h3></div>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag edit">replace</span></div>
+        <button class="copy-btn" data-copy="src-s5-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s5-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s5-main">package main
+
+import "fmt"
+
+func run(input string) {
+	env := NewEnvironment()
+	l := NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		fmt.Printf("parser errors for %q: %v\n", input, p.Errors())
+		return
+	}
+
+	result := Eval(program, env)
+	if result == nil {
+		fmt.Printf("%s\n  => <nil>\n\n", input)
+		return
+	}
+	fmt.Printf("%s\n  => %s\n\n", input, result.Inspect())
+}
+
+func main() {
+	run(`let x = 5; let y = 10; x + y;`)
+
+	run(`
+let newAdder = fn(x) {
+  fn(y) { x + y };
+};
+let addTwo = newAdder(2);
+addTwo(3);
+`)
+
+	run(`
+let fibonacci = fn(n) {
+  if (n < 2) {
+    return n;
+  }
+  return fibonacci(n - 1) + fibonacci(n - 2);
+};
+fibonacci(10);
+`)
+
+	run(`
+let makeCounter = fn() {
+  let count = 0;
+  fn() {
+    let count = count + 1;
+    count;
+  };
+};
+let counter = makeCounter();
+counter();
+`)
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+let x = 5; let y = 10; x + y;
+  => 15
+
+let newAdder = fn(x) { fn(y) { x + y }; };
+let addTwo = newAdder(2);
+addTwo(3);
+  => 5
+
+let fibonacci = fn(n) { if (n < 2) { return n; } return fibonacci(n - 1) + fibonacci(n - 2); };
+fibonacci(10);
+  => 55
+
+let makeCounter = fn() { let count = 0; fn() { let count = count + 1; count; }; };
+let counter = makeCounter();
+counter();
+  => 1</pre>
+    </div>
+  </div>
+
+  <div class="callout gotcha">
+    <span class="k">A genuine limitation, not a bug</span>
+    Notice <code>counter()</code> returns <code>1</code> every single time
+    you call it, instead of counting up. Look closely at the body:
+    <code>let count = count + 1;</code> — that <code>let</code> creates a
+    <strong>new</strong> local binding on every call; it reads the outer
+    <code>count</code> (always <code>0</code>) and shadows it with a fresh
+    one. Nuru, as built so far, has no way to <em>rebind</em> an existing
+    variable — only to declare new ones. That's exactly what this session's
+    exercise fixes.
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">=</span><h4>Exercise — add assignment (make the counter actually count)</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">
+      Add an <code>AssignExpression</code> (<code>x = x + 1</code>, no
+      <code>let</code>) that rebinds an existing variable instead of
+      shadowing it.
+    </p>
+    <ol>
+      <li>Add an <code>AssignExpression{ Name *Identifier, Value Expression }</code> node to <code>ast.go</code>.</li>
+      <li>In <code>parser.go</code>, add an <code>ASSIGNMENT</code> precedence level (between <code>LOWEST</code> and <code>EQUALS</code>), map <code>ASSIGN</code> to it, and register <code>ASSIGN</code> as an infix operator whose parse function expects the left side to be an <code>*Identifier</code>.</li>
+      <li>Add an <code>Assign</code> method to <code>Environment</code> that walks <em>outward</em> through the <code>outer</code> chain looking for an existing binding to update — unlike <code>Set</code>, it must fail if the name was never declared with <code>let</code>.</li>
+      <li>Handle <code>*AssignExpression</code> in <code>Eval</code> by evaluating the value and calling <code>env.Assign</code>.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>ast.go</span><span class="tag edit">append</span></div></div>
+          <pre class="code-block"><code id="code-ex5-ast" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex5-ast">// AssignExpression: <Name> = <Value> -- rebinds an EXISTING variable,
+// unlike `let` which introduces a new one.
+type AssignExpression struct {
+	Token Token // the '=' token
+	Name  *Identifier
+	Value Expression
+}
+
+func (ae *AssignExpression) expressionNode()      {}
+func (ae *AssignExpression) TokenLiteral() string { return ae.Token.Literal }
+func (ae *AssignExpression) String() string {
+	var out bytes.Buffer
+	out.WriteString(ae.Name.String())
+	out.WriteString(" = ")
+	out.WriteString(ae.Value.String())
+	return out.String()
+}</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>parser.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex5-parser" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex5-parser">const (
+	_ int = iota
+	LOWEST
+	ASSIGNMENT  // =
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+	CALL        // myFunction(X)
+)
+
+var precedences = map[TokenType]int{
+	ASSIGN: ASSIGNMENT,
+	// ... the rest stay the same
+}
+
+// in NewParser:
+p.registerInfix(ASSIGN, p.parseAssignExpression)
+
+func (p *Parser) parseAssignExpression(left Expression) Expression {
+	ident, ok := left.(*Identifier)
+	if !ok {
+		p.errors = append(p.errors, fmt.Sprintf("expected identifier on left side of assignment, got %T", left))
+		return nil
+	}
+	expr := &AssignExpression{Token: p.curToken, Name: ident}
+	p.nextToken()
+	expr.Value = p.parseExpression(LOWEST)
+	return expr
+}</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>environment.go</span><span class="tag edit">append</span></div></div>
+          <pre class="code-block"><code id="code-ex5-env" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex5-env">// Assign rebinds a name that must already exist somewhere in the chain,
+// walking outward until it finds the environment that owns it. Unlike Set,
+// it never creates a new binding -- that's what `let` is for.
+func (e *Environment) Assign(name string, val Object) (Object, bool) {
+	if _, ok := e.store[name]; ok {
+		e.store[name] = val
+		return val, true
+	}
+	if e.outer != nil {
+		return e.outer.Assign(name, val)
+	}
+	return nil, false
+}</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>evaluator.go</span><span class="tag edit">edit — inside Eval's switch</span></div></div>
+          <pre class="code-block"><code id="code-ex5-eval" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex5-eval">case *AssignExpression:
+	val := Eval(node.Value, env)
+	if isError(val) {
+		return val
+	}
+	if _, ok := env.Assign(node.Name.Value, val); !ok {
+		return newError("identifier not found: " + node.Name.Value)
+	}
+	return val</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>  <span style="color:var(--text-dimmer)"># counter body now uses "count = count + 1;"</span>
+3</pre>
+        </div>
+        <p style="font-size:13.5px; color:var(--text-dim); margin-top:10px;">Three calls to <code>counter()</code> in a row now correctly print <code>3</code> instead of <code>1, 1, 1</code>.</p>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="s6" class="session divider-top">
+  <div class="session-head">
+    <span class="session-num">SESSION 06</span>
+    <span class="session-dur">1h 30m</span>
+  </div>
+  <h2>From tree-walking to bytecode: a compiler and a VM</h2>
+  <p class="lede">
+    The evaluator from Sessions 4–5 re-walks the AST every single time it
+    runs — fine for a workshop, expensive in production (it's part of why
+    real language runtimes compile). This closing session builds a second,
+    independent execution engine: a <strong>compiler</strong> that turns the
+    AST into flat bytecode, and a <strong>virtual machine</strong> that
+    executes it on a stack.
+  </p>
+
+  <div class="callout warn">
+    <span class="k">A fresh, smaller sub-project</span>
+    To keep this session self-contained, build it in a new folder (or new
+    module) alongside <code>nuru</code> — reuse <code>token.go</code>,
+    <code>lexer.go</code>, <code>ast.go</code>, and <code>parser.go</code>
+    as they stood at the <em>end of Session 3</em> (before variables or
+    functions existed), plus a small, VM-specific <code>object.go</code>.
+    We're deliberately not (yet) compiling variables or function calls to
+    bytecode — that's real, meaty follow-up work, sketched out in
+    <a href="#next">Next steps</a>.
+  </div>
+
+  <ul class="obj-list">
+    <li>Understand why bytecode + a VM can outperform tree-walking</li>
+    <li>Define an instruction format: an opcode plus fixed-width operands</li>
+    <li>Write a compiler that walks the AST once and emits instructions</li>
+    <li>Handle <code>if</code>/<code>else</code> using jump instructions with back-patched targets</li>
+    <li>Write a stack machine that executes the bytecode</li>
+  </ul>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 1</span><h3>A minimal object system</h3></div>
+    <p>The VM needs runtime values too — a smaller version of Session 4's <code>object.go</code>:</p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>object.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s6-object">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s6-object" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s6-object">package main
+
+import "fmt"
+
+type ObjectType string
+
+const (
+	INTEGER_OBJ = "INTEGER"
+	BOOLEAN_OBJ = "BOOLEAN"
+	NULL_OBJ    = "NULL"
+)
+
+type Object interface {
+	Type() ObjectType
+	Inspect() string
+}
+
+type Integer struct{ Value int64 }
+
+func (i *Integer) Type() ObjectType { return INTEGER_OBJ }
+func (i *Integer) Inspect() string  { return fmt.Sprintf("%d", i.Value) }
+
+type Boolean_ struct{ Value bool }
+
+func (b *Boolean_) Type() ObjectType { return BOOLEAN_OBJ }
+func (b *Boolean_) Inspect() string  { return fmt.Sprintf("%t", b.Value) }
+
+type Null struct{}
+
+func (n *Null) Type() ObjectType { return NULL_OBJ }
+func (n *Null) Inspect() string  { return "null" }
+
+var (
+	TRUE_OBJ  = &Boolean_{Value: true}
+	FALSE_OBJ = &Boolean_{Value: false}
+	NULL      = &Null{}
+)</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 2</span><h3>Define the instruction format</h3></div>
+    <p>
+      Create <code>code.go</code>. An instruction is one opcode byte followed
+      by however many operand bytes that opcode needs — <code>OpConstant</code>
+      takes a 2-byte index into a constant pool; <code>OpAdd</code> takes no
+      operands at all, because it just acts on whatever's already on the
+      stack. The <code>Definition</code> map is what lets <code>Make</code>
+      and the disassembler stay generic instead of one giant switch each.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>code.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s6-code">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s6-code" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s6-code">package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+)
+
+// Instructions is just a stream of bytes: one opcode followed by however
+// many bytes its operands need.
+type Instructions []byte
+
+type Opcode byte
+
+const (
+	OpConstant      Opcode = iota // push a constant from the constant pool: 2-byte operand (index)
+	OpAdd                         // pop two, push their sum
+	OpSub
+	OpMul
+	OpDiv
+	OpTrue  // push the shared `true` object
+	OpFalse // push the shared `false` object
+	OpEqual
+	OpNotEqual
+	OpGreaterThan
+	OpMinus // pop one, push its arithmetic negation
+	OpBang  // pop one, push its boolean negation
+	OpPop   // pop and discard (used after each top-level expression statement)
+	OpJumpNotTruthy // 2-byte operand: jump target if top-of-stack is falsy
+	OpJump          // 2-byte operand: unconditional jump target
+	OpNull          // push the shared `null` object
+)
+
+// Definition documents how many operands an opcode takes and how wide
+// (in bytes) each operand is. This is what makes Make() and the
+// disassembler generic instead of a giant switch statement.
+type Definition struct {
+	Name          string
+	OperandWidths []int
+}
+
+var definitions = map[Opcode]*Definition{
+	OpConstant:      {"OpConstant", []int{2}},
+	OpAdd:           {"OpAdd", []int{}},
+	OpSub:           {"OpSub", []int{}},
+	OpMul:           {"OpMul", []int{}},
+	OpDiv:           {"OpDiv", []int{}},
+	OpTrue:          {"OpTrue", []int{}},
+	OpFalse:         {"OpFalse", []int{}},
+	OpEqual:         {"OpEqual", []int{}},
+	OpNotEqual:      {"OpNotEqual", []int{}},
+	OpGreaterThan:   {"OpGreaterThan", []int{}},
+	OpMinus:         {"OpMinus", []int{}},
+	OpBang:          {"OpBang", []int{}},
+	OpPop:           {"OpPop", []int{}},
+	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
+	OpJump:          {"OpJump", []int{2}},
+	OpNull:          {"OpNull", []int{}},
+}
+
+func Lookup(op Opcode) (*Definition, error) {
+	def, ok := definitions[op]
+	if !ok {
+		return nil, fmt.Errorf("opcode %d undefined", op)
+	}
+	return def, nil
+}
+
+// Make encodes a single instruction: opcode byte + big-endian operand bytes.
+func Make(op Opcode, operands ...int) Instructions {
+	def, ok := definitions[op]
+	if !ok {
+		return Instructions{}
+	}
+
+	instructionLen := 1
+	for _, w := range def.OperandWidths {
+		instructionLen += w
+	}
+
+	instruction := make(Instructions, instructionLen)
+	instruction[0] = byte(op)
+
+	offset := 1
+	for i, o := range operands {
+		width := def.OperandWidths[i]
+		switch width {
+		case 2:
+			binary.BigEndian.PutUint16(instruction[offset:], uint16(o))
+		case 1:
+			instruction[offset] = byte(o)
+		}
+		offset += width
+	}
+	return instruction
+}
+
+func ReadUint16(ins Instructions) uint16 {
+	return binary.BigEndian.Uint16(ins)
+}
+
+// String disassembles a whole instruction stream into a human-readable
+// listing -- handy for showing participants exactly what the compiler
+// produced.
+func (ins Instructions) String() string {
+	var out bytes.Buffer
+
+	i := 0
+	for i < len(ins) {
+		def, err := Lookup(Opcode(ins[i]))
+		if err != nil {
+			fmt.Fprintf(&out, "ERROR: %s\n", err)
+			i++
+			continue
+		}
+
+		operands, read := readOperands(def, ins[i+1:])
+		fmt.Fprintf(&out, "%04d %s\n", i, fmtInstruction(def, operands))
+		i += 1 + read
+	}
+	return out.String()
+}
+
+func fmtInstruction(def *Definition, operands []int) string {
+	switch len(operands) {
+	case 0:
+		return def.Name
+	case 1:
+		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	}
+	return fmt.Sprintf("ERROR: unhandled operand count for %s", def.Name)
+}
+
+func readOperands(def *Definition, ins Instructions) ([]int, int) {
+	operands := make([]int, len(def.OperandWidths))
+	offset := 0
+
+	for i, width := range def.OperandWidths {
+		switch width {
+		case 2:
+			operands[i] = int(ReadUint16(ins[offset:]))
+		}
+		offset += width
+	}
+	return operands, offset
+}</script>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 3</span><h3>Write the compiler</h3></div>
+    <p>
+      Create <code>compiler.go</code>. It walks the same AST from Sessions
+      2–3, but instead of computing a value, it <em>emits instructions</em>.
+      The one genuinely new idea is how <code>if</code>/<code>else</code>
+      compiles: we emit a conditional jump with a placeholder target,
+      compile the branch, and only then go back and patch in the real jump
+      offset — because we don't know how far to jump until we've compiled
+      what we're jumping over.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>compiler.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s6-compiler">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s6-compiler" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s6-compiler">package main
+
+import "fmt"
+
+type Compiler struct {
+	instructions Instructions
+	constants    []Object
+
+	lastInstruction     EmittedInstruction
+	previousInstruction EmittedInstruction
+}
+
+type EmittedInstruction struct {
+	Opcode   Opcode
+	Position int
+}
+
+func NewCompiler() *Compiler {
+	return &Compiler{
+		instructions: Instructions{},
+		constants:    []Object{},
+	}
+}
+
+type Bytecode struct {
+	Instructions Instructions
+	Constants    []Object
+}
+
+func (c *Compiler) Bytecode() *Bytecode {
+	return &Bytecode{Instructions: c.instructions, Constants: c.constants}
+}
+
+func (c *Compiler) Compile(node Node) error {
+	switch node := node.(type) {
+
+	case *Program:
+		for _, s := range node.Statements {
+			if err := c.Compile(s); err != nil {
+				return err
+			}
+		}
+
+	case *ExpressionStatement:
+		if err := c.Compile(node.Expression); err != nil {
+			return err
+		}
+		c.emit(OpPop) // discard the value; nothing at the top level keeps it
+
+	case *InfixExpression:
+		// "<" is compiled by swapping operands and reusing OpGreaterThan --
+		// one less opcode for the VM to implement.
+		if node.Operator == "<" {
+			if err := c.Compile(node.Right); err != nil {
+				return err
+			}
+			if err := c.Compile(node.Left); err != nil {
+				return err
+			}
+			c.emit(OpGreaterThan)
+			return nil
+		}
+
+		if err := c.Compile(node.Left); err != nil {
+			return err
+		}
+		if err := c.Compile(node.Right); err != nil {
+			return err
+		}
+
+		switch node.Operator {
+		case "+":
+			c.emit(OpAdd)
+		case "-":
+			c.emit(OpSub)
+		case "*":
+			c.emit(OpMul)
+		case "/":
+			c.emit(OpDiv)
+		case ">":
+			c.emit(OpGreaterThan)
+		case "==":
+			c.emit(OpEqual)
+		case "!=":
+			c.emit(OpNotEqual)
+		default:
+			return fmt.Errorf("unknown operator %s", node.Operator)
+		}
+
+	case *PrefixExpression:
+		if err := c.Compile(node.Right); err != nil {
+			return err
+		}
+		switch node.Operator {
+		case "!":
+			c.emit(OpBang)
+		case "-":
+			c.emit(OpMinus)
+		default:
+			return fmt.Errorf("unknown operator %s", node.Operator)
+		}
+
+	case *IfExpression:
+		if err := c.Compile(node.Condition); err != nil {
+			return err
+		}
+
+		// Emit OpJumpNotTruthy with a placeholder operand -- we don't know
+		// where the "else" branch starts until we've compiled "then".
+		jumpNotTruthyPos := c.emit(OpJumpNotTruthy, 9999)
+
+		if err := c.Compile(node.Consequence); err != nil {
+			return err
+		}
+		if c.lastInstructionIsPop() {
+			c.removeLastPop() // keep the if's value on the stack instead of popping it
+		}
+
+		jumpPos := c.emit(OpJump, 9999)
+
+		afterConsequencePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
+		if node.Alternative == nil {
+			c.emit(OpNull)
+		} else {
+			if err := c.Compile(node.Alternative); err != nil {
+				return err
+			}
+			if c.lastInstructionIsPop() {
+				c.removeLastPop()
+			}
+		}
+
+		afterAlternativePos := len(c.instructions)
+		c.changeOperand(jumpPos, afterAlternativePos)
+
+	case *BlockStatement:
+		for _, s := range node.Statements {
+			if err := c.Compile(s); err != nil {
+				return err
+			}
+		}
+
+	case *IntegerLiteral:
+		integer := &Integer{Value: node.Value}
+		c.emit(OpConstant, c.addConstant(integer))
+
+	case *Boolean:
+		if node.Value {
+			c.emit(OpTrue)
+		} else {
+			c.emit(OpFalse)
+		}
+	}
+
+	return nil
+}
+
+func (c *Compiler) addConstant(obj Object) int {
+	c.constants = append(c.constants, obj)
+	return len(c.constants) - 1
+}
+
+func (c *Compiler) emit(op Opcode, operands ...int) int {
+	ins := Make(op, operands...)
+	pos := len(c.instructions)
+	c.instructions = append(c.instructions, ins...)
+
+	c.previousInstruction = c.lastInstruction
+	c.lastInstruction = EmittedInstruction{Opcode: op, Position: pos}
+	return pos
+}
+
+func (c *Compiler) lastInstructionIsPop() bool {
+	return c.lastInstruction.Opcode == OpPop
+}
+
+func (c *Compiler) removeLastPop() {
+	c.instructions = c.instructions[:c.lastInstruction.Position]
+	c.lastInstruction = c.previousInstruction
+}
+
+// changeOperand patches an already-emitted instruction's operand in place --
+// this is how we back-patch jump targets once we know them.
+func (c *Compiler) changeOperand(opPos int, operand int) {
+	op := Opcode(c.instructions[opPos])
+	newInstruction := Make(op, operand)
+
+	for i := 0; i < len(newInstruction); i++ {
+		c.instructions[opPos+i] = newInstruction[i]
+	}
+}</script>
+
+    <div class="callout">
+      <span class="k">The "&lt;" trick</span>
+      Look at how <code>node.Operator == "&lt;"</code> is handled: instead of
+      adding a whole new <code>OpLessThan</code> opcode, the compiler just
+      compiles the right-hand side first, then the left, then emits
+      <code>OpGreaterThan</code>. <code>3 &lt; 5</code> compiles as if it
+      were written <code>5 &gt; 3</code>. One less opcode for the VM to
+      implement, for free.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 4</span><h3>Write the VM</h3></div>
+    <p>
+      Create <code>vm.go</code>. It's a simple stack machine: an instruction
+      pointer walks the bytecode, and each opcode pops however many operands
+      it needs off the stack and pushes its result back on.
+    </p>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>vm.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s6-vm">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s6-vm" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s6-vm">package main
+
+import "fmt"
+
+const StackSize = 2048
+
+type VM struct {
+	constants    []Object
+	instructions Instructions
+
+	stack []Object
+	sp    int // points to the next free slot; top of stack is stack[sp-1]
+}
+
+func NewVM(bytecode *Bytecode) *VM {
+	return &VM{
+		instructions: bytecode.Instructions,
+		constants:    bytecode.Constants,
+		stack:        make([]Object, StackSize),
+		sp:           0,
+	}
+}
+
+func (vm *VM) StackTop() Object {
+	if vm.sp == 0 {
+		return nil
+	}
+	return vm.stack[vm.sp-1]
+}
+
+// LastPoppedStackElem is handy for tests/demos: after a full program runs,
+// every top-level expression's value was pushed then popped, so this is
+// where we can still see it.
+func (vm *VM) LastPoppedStackElem() Object {
+	return vm.stack[vm.sp]
+}
+
+func (vm *VM) push(obj Object) error {
+	if vm.sp >= StackSize {
+		return fmt.Errorf("stack overflow")
+	}
+	vm.stack[vm.sp] = obj
+	vm.sp++
+	return nil
+}
+
+func (vm *VM) pop() Object {
+	obj := vm.stack[vm.sp-1]
+	vm.sp--
+	return obj
+}
+
+func (vm *VM) Run() error {
+	for ip := 0; ip < len(vm.instructions); ip++ {
+		op := Opcode(vm.instructions[ip])
+
+		switch op {
+		case OpConstant:
+			constIndex := ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+			if err := vm.push(vm.constants[constIndex]); err != nil {
+				return err
+			}
+
+		case OpAdd, OpSub, OpMul, OpDiv:
+			if err := vm.executeBinaryOperation(op); err != nil {
+				return err
+			}
+
+		case OpTrue:
+			if err := vm.push(TRUE_OBJ); err != nil {
+				return err
+			}
+		case OpFalse:
+			if err := vm.push(FALSE_OBJ); err != nil {
+				return err
+			}
+		case OpNull:
+			if err := vm.push(NULL); err != nil {
+				return err
+			}
+
+		case OpEqual, OpNotEqual, OpGreaterThan:
+			if err := vm.executeComparison(op); err != nil {
+				return err
+			}
+
+		case OpBang:
+			if err := vm.executeBangOperator(); err != nil {
+				return err
+			}
+		case OpMinus:
+			if err := vm.executeMinusOperator(); err != nil {
+				return err
+			}
+
+		case OpJump:
+			pos := int(ReadUint16(vm.instructions[ip+1:]))
+			ip = pos - 1 // -1 because the for loop's ip++ will advance us onto `pos`
+
+		case OpJumpNotTruthy:
+			pos := int(ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+			condition := vm.pop()
+			if !isTruthy(condition) {
+				ip = pos - 1
+			}
+
+		case OpPop:
+			vm.pop()
+		}
+	}
+	return nil
+}
+
+func (vm *VM) executeBinaryOperation(op Opcode) error {
+	right := vm.pop()
+	left := vm.pop()
+
+	leftInt, leftOk := left.(*Integer)
+	rightInt, rightOk := right.(*Integer)
+	if !leftOk || !rightOk {
+		return fmt.Errorf("unsupported types for binary operation: %s %s", left.Type(), right.Type())
+	}
+
+	var result int64
+	switch op {
+	case OpAdd:
+		result = leftInt.Value + rightInt.Value
+	case OpSub:
+		result = leftInt.Value - rightInt.Value
+	case OpMul:
+		result = leftInt.Value * rightInt.Value
+	case OpDiv:
+		result = leftInt.Value / rightInt.Value
+	default:
+		return fmt.Errorf("unknown integer operator: %d", op)
+	}
+	return vm.push(&Integer{Value: result})
+}
+
+func (vm *VM) executeComparison(op Opcode) error {
+	right := vm.pop()
+	left := vm.pop()
+
+	leftInt, leftIsInt := left.(*Integer)
+	rightInt, rightIsInt := right.(*Integer)
+
+	if leftIsInt && rightIsInt {
+		switch op {
+		case OpEqual:
+			return vm.push(nativeBoolToBooleanObject(leftInt.Value == rightInt.Value))
+		case OpNotEqual:
+			return vm.push(nativeBoolToBooleanObject(leftInt.Value != rightInt.Value))
+		case OpGreaterThan:
+			return vm.push(nativeBoolToBooleanObject(leftInt.Value > rightInt.Value))
+		default:
+			return fmt.Errorf("unknown operator: %d", op)
+		}
+	}
+
+	switch op {
+	case OpEqual:
+		return vm.push(nativeBoolToBooleanObject(left == right))
+	case OpNotEqual:
+		return vm.push(nativeBoolToBooleanObject(left != right))
+	default:
+		return fmt.Errorf("unknown operator: %d (%s %s)", op, left.Type(), right.Type())
+	}
+}
+
+func (vm *VM) executeBangOperator() error {
+	operand := vm.pop()
+	switch operand {
+	case TRUE_OBJ:
+		return vm.push(FALSE_OBJ)
+	case FALSE_OBJ:
+		return vm.push(TRUE_OBJ)
+	case NULL:
+		return vm.push(TRUE_OBJ)
+	default:
+		return vm.push(FALSE_OBJ)
+	}
+}
+
+func (vm *VM) executeMinusOperator() error {
+	operand := vm.pop()
+	integer, ok := operand.(*Integer)
+	if !ok {
+		return fmt.Errorf("unsupported type for negation: %s", operand.Type())
+	}
+	return vm.push(&Integer{Value: -integer.Value})
+}
+
+func nativeBoolToBooleanObject(input bool) *Boolean_ {
+	if input {
+		return TRUE_OBJ
+	}
+	return FALSE_OBJ
+}
+
+func isTruthy(obj Object) bool {
+	switch obj := obj.(type) {
+	case *Boolean_:
+		return obj.Value
+	case *Null:
+		return false
+	default:
+		return true
+	}
+}</script>
+
+    <div class="callout warn">
+      <span class="k">Watch the instruction pointer around jumps</span>
+      <code>case OpJump:</code> sets <code>ip = pos - 1</code>, not
+      <code>ip = pos</code>. That's not an off-by-one bug — the
+      <code>for</code> loop's own <code>ip++</code> runs right after the
+      switch, so subtracting 1 first is what makes execution actually land
+      exactly on <code>pos</code> on the next iteration.
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-head"><span class="step-badge">STEP 5</span><h3>Try it — compile, disassemble, and run</h3></div>
+    <div class="code-file">
+      <div class="code-file-bar">
+        <div class="code-file-name"><span>main.go</span><span class="tag new">new file</span></div>
+        <button class="copy-btn" data-copy="src-s6-main">Copy</button>
+      </div>
+      <pre class="code-block"><code id="code-s6-main" data-lang="go"></code></pre>
+    </div>
+    <script type="text/plain" id="src-s6-main">package main
+
+import "fmt"
+
+func run(input string) {
+	l := NewLexer(input)
+	p := NewParser(l)
+	program := p.ParseProgram()
+	if len(p.Errors()) != 0 {
+		fmt.Printf("parser errors for %q: %v\n", input, p.Errors())
+		return
+	}
+
+	comp := NewCompiler()
+	if err := comp.Compile(program); err != nil {
+		fmt.Printf("compile error: %s\n", err)
+		return
+	}
+
+	bytecode := comp.Bytecode()
+	fmt.Printf("input: %s\n", input)
+	fmt.Print(bytecode.Instructions.String())
+
+	machine := NewVM(bytecode)
+	if err := machine.Run(); err != nil {
+		fmt.Printf("vm error: %s\n", err)
+		return
+	}
+
+	fmt.Printf("=> %s\n\n", machine.LastPoppedStackElem().Inspect())
+}
+
+func main() {
+	run("1 + 2")
+	run("(5 + 10 * 2 + 15 / 3) * 2 + -10")
+	run("true == (1 < 2)")
+	run("if (1 > 2) { 10 } else { 20 }")
+	run("if (false) { 10 }")
+}</script>
+
+    <div class="run-block">
+      <div class="run-bar">terminal</div>
+      <pre><span class="prompt">$</span> <span class="out">go run .</span>
+input: 1 + 2
+0000 OpConstant 0
+0003 OpConstant 1
+0006 OpAdd
+0007 OpPop
+=> 3
+
+input: (5 + 10 * 2 + 15 / 3) * 2 + -10
+0000 OpConstant 0
+0003 OpConstant 1
+0006 OpConstant 2
+0009 OpMul
+0010 OpAdd
+0011 OpConstant 3
+0014 OpConstant 4
+0017 OpDiv
+0018 OpAdd
+0019 OpConstant 5
+0022 OpMul
+0023 OpConstant 6
+0026 OpMinus
+0027 OpAdd
+0028 OpPop
+=> 50
+
+input: true == (1 < 2)
+0000 OpTrue
+0001 OpConstant 0
+0004 OpConstant 1
+0007 OpGreaterThan
+0008 OpEqual
+0009 OpPop
+=> true
+
+input: if (1 > 2) { 10 } else { 20 }
+0000 OpConstant 0
+0003 OpConstant 1
+0006 OpGreaterThan
+0007 OpJumpNotTruthy 16
+0010 OpConstant 2
+0013 OpJump 19
+0016 OpConstant 3
+0019 OpPop
+=> 20
+
+input: if (false) { 10 }
+0000 OpFalse
+0001 OpJumpNotTruthy 10
+0004 OpConstant 0
+0007 OpJump 11
+0010 OpNull
+0011 OpPop
+=> null</pre>
+    </div>
+    <p>
+      That disassembly is worth reading line by line once: notice
+      <code>true == (1 &lt; 2)</code> compiles the comparison as
+      <code>OpGreaterThan</code> with its operands swapped (the "&lt;" trick
+      from Step 3), and the <code>if</code> with no <code>else</code> falls
+      through to <code>OpNull</code> — confirming that in Nuru, an
+      <code>if</code> with no matching branch evaluates to <code>null</code>,
+      exactly like it does in the tree-walking evaluator.
+    </p>
+  </div>
+
+  <div class="checkpoint">
+    <span class="mark">✓</span>
+    <div><b>Checkpoint.</b> You've now built the same language two different ways — walking the tree directly, and compiling to bytecode for a small VM. Real language runtimes (the JVM, CPython, Lua) all use some variation of the second approach for exactly the performance reason mentioned at the top of this session.</div>
+  </div>
+
+  <div class="exercise">
+    <div class="exercise-head"><span class="icon">%</span><h4>Exercise — modulo, full circle</h4></div>
+    <p style="margin:0 0 10px; font-size:14.5px; color:var(--text-dim);">
+      Take <code>%</code> all the way through the compiler and VM — the same
+      operator you first lexed in Session 1.
+    </p>
+    <ol>
+      <li>Add an <code>OpMod</code> opcode to <code>code.go</code>, next to <code>OpDiv</code> (no operands, same as the other arithmetic ops).</li>
+      <li>In <code>compiler.go</code>'s <code>*InfixExpression</code> case, add <code>case "%": c.emit(OpMod)</code>.</li>
+      <li>In <code>vm.go</code>, add <code>OpMod</code> to the case list that calls <code>executeBinaryOperation</code>, and add a <code>case OpMod:</code> inside it computing <code>leftInt.Value % rightInt.Value</code>.</li>
+    </ol>
+    <details class="reveal">
+      <summary>Reveal solution</summary>
+      <div class="reveal-body">
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>code.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex6-code" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex6-code">const (
+	OpConstant Opcode = iota
+	OpAdd
+	OpSub
+	OpMul
+	OpDiv
+	OpMod
+	// ... the rest unchanged
+)
+
+var definitions = map[Opcode]*Definition{
+	// ...
+	OpDiv: {"OpDiv", []int{}},
+	OpMod: {"OpMod", []int{}},
+	// ...
+}</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>compiler.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex6-compiler" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex6-compiler">case "/":
+	c.emit(OpDiv)
+case "%":
+	c.emit(OpMod)</script>
+        <div class="code-file">
+          <div class="code-file-bar"><div class="code-file-name"><span>vm.go</span><span class="tag edit">edit</span></div></div>
+          <pre class="code-block"><code id="code-ex6-vm" data-lang="go"></code></pre>
+        </div>
+        <script type="text/plain" id="src-ex6-vm">case OpAdd, OpSub, OpMul, OpDiv, OpMod:
+	if err := vm.executeBinaryOperation(op); err != nil {
+		return err
+	}
+
+// inside executeBinaryOperation's switch:
+case OpDiv:
+	result = leftInt.Value / rightInt.Value
+case OpMod:
+	result = leftInt.Value % rightInt.Value</script>
+        <div class="run-block">
+          <div class="run-bar">terminal</div>
+          <pre><span class="prompt">$</span> <span class="out">go run .</span>
+10 % 3 => 1
+17 % 5 == 2 => true
+(20 + 5) % 7 => 4</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+<div class="wrap">
+<section id="next" class="session divider-top">
+  <div class="section-head">
+    <div class="eyebrow">You've built a language, twice</div>
+    <h2>Where to go from here</h2>
+    <p class="lede">
+      Nuru is deliberately small. Every item below is a real, well-scoped
+      extension you now have the foundation to tackle on your own —
+      roughly ordered from "next weekend" to "next few weekends."
+    </p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4 style="font-size:15px;">Grow the language</h4>
+      <ul class="obj-list" style="margin:10px 0 0;">
+        <li>String and array literals, plus indexing (<code>arr[0]</code>)</li>
+        <li>A hash/map literal type</li>
+        <li><code>&amp;&amp;</code> / <code>||</code> with short-circuit evaluation</li>
+        <li>A handful of built-in functions (<code>len</code>, <code>print</code>)</li>
+        <li><code>for</code> loops, or a <code>while</code>-style construct</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="font-size:15px;">Grow the VM</h4>
+      <ul class="obj-list" style="margin:10px 0 0;">
+        <li>Compile <code>let</code> and identifiers using a symbol table</li>
+        <li>Compile function literals and calls — this needs frames, not just a flat stack</li>
+        <li>A garbage collector, once the object graph gets cyclic</li>
+        <li>Benchmark the VM against the tree-walking evaluator on something like recursive Fibonacci — the gap is the whole point of Session 6</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <span class="k">Further reading</span>
+    This workshop's structure — lexer → Pratt parser → tree-walking
+    evaluator → bytecode compiler and VM — closely follows the path taken in
+    Thorsten Ball's <em>Writing An Interpreter In Go</em> and its sequel,
+    <em>Writing A Compiler In Go</em>. If any single session here clicked,
+    those books go several times deeper into the same ideas. Bob Nystrom's
+    <em>Crafting Interpreters</em> (free online) covers the same ground again
+    in a different implementation language, which is a genuinely good way to
+    see which parts of this design are fundamental and which were just one
+    author's choice.
+  </div>
+
+  <div class="btn-row">
+    <a class="btn primary" href="#s1">Start Session 1 again ↑</a>
+    <a class="btn" href="#setup">Back to setup</a>
+  </div>
+</section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <p>Built for developers a few months into Go who already know the syntax and want to see what's actually happening underneath a language. Every code listing on this page was compiled and executed before being written down — if something doesn't behave as shown, it's worth re-checking your version against the listing character for character before anything else.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Go syntax highlighter (self-contained, no CDN) ----------
+  function escapeHtml(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  var KEYWORDS = new Set(["break","case","chan","const","continue","default","defer","else","fallthrough","for","func","go","goto","if","import","interface","map","package","range","return","select","struct","switch","type","var"]);
+  var TYPES = new Set(["int","int64","int32","byte","bool","string","float64","error","rune","uint","uint8","uint16","uint32","uint64","any"]);
+  var CONSTANTS = new Set(["true","false","nil","iota"]);
+
+  function highlightGo(src){
+    var escaped = escapeHtml(src);
+    var tokenRe = /(\/\/[^\n]*)|(`[^`]*`)|("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_]\w*)/g;
+    return escaped.replace(tokenRe, function(match, lineComment, rawStr, dqStr, charLit, num, ident){
+      if (lineComment) return '<span class="tok-com">' + lineComment + '</span>';
+      if (rawStr) return '<span class="tok-str">' + rawStr + '</span>';
+      if (dqStr) return '<span class="tok-str">' + dqStr + '</span>';
+      if (charLit) return '<span class="tok-str">' + charLit + '</span>';
+      if (num) return '<span class="tok-num">' + num + '</span>';
+      if (ident){
+        if (KEYWORDS.has(ident)) return '<span class="tok-kw">' + ident + '</span>';
+        if (CONSTANTS.has(ident)) return '<span class="tok-const">' + ident + '</span>';
+        if (TYPES.has(ident)) return '<span class="tok-type">' + ident + '</span>';
+        return ident;
+      }
+      return match;
+    });
+  }
+
+  // Populate every highlighted code block from its paired <script type="text/plain"> source.
+  document.querySelectorAll('code[data-lang="go"]').forEach(function(el){
+    var srcEl = document.getElementById('src-' + el.id.slice('code-'.length));
+    if (!srcEl) return;
+    var raw = srcEl.textContent.replace(/^\n/, '').replace(/\n$/, '');
+    el.innerHTML = highlightGo(raw);
+  });
+
+  // Copy-to-clipboard buttons.
+  document.querySelectorAll('.copy-btn[data-copy]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var srcEl = document.getElementById(btn.getAttribute('data-copy'));
+      if (!srcEl) return;
+      var text = srcEl.textContent.replace(/^\n/, '').replace(/\n$/, '');
+      navigator.clipboard.writeText(text).then(function(){
+        var original = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(function(){ btn.textContent = original; btn.classList.remove('copied'); }, 1600);
+      }).catch(function(){ /* clipboard API unavailable; silently ignore */ });
+    });
+  });
+
+  // ---------- Scroll-spy on the top nav ----------
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll('.topnav a'));
+  var sections = navLinks.map(function(a){ return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+  if ('IntersectionObserver' in window && sections.length){
+    var byId = {};
+    navLinks.forEach(function(a){ byId[a.getAttribute('href').slice(1)] = a; });
+    var observer = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        var link = byId[entry.target.id];
+        if (!link) return;
+        if (entry.isIntersecting){
+          navLinks.forEach(function(a){ a.classList.remove('active'); });
+          link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+    sections.forEach(function(s){ observer.observe(s); });
+  }
+
+  // ---------- Overview pipeline: highlight the stage in view ----------
+  var stageEls = Array.prototype.slice.call(document.querySelectorAll('#overview-pipeline .stage'));
+  var stageTargets = ['s1','s2','s3','s4','s5','s6'].map(function(id){ return document.getElementById(id); });
+  if ('IntersectionObserver' in window && stageEls.length){
+    var stageObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        var idx = stageTargets.indexOf(entry.target);
+        if (idx === -1) return;
+        if (entry.isIntersecting){
+          stageEls.forEach(function(el){ el.classList.remove('active'); });
+          stageEls[idx].classList.add('active');
+        }
+      });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+    stageTargets.forEach(function(t){ if (t) stageObserver.observe(t); });
+  }
+
+  // ---------- Live tokenizer demo in the hero ----------
+  var TT = {
+    LET:"LET", FN:"FUNCTION", TRUE:"TRUE", FALSE:"FALSE", IF:"IF", ELSE:"ELSE", RETURN:"RETURN",
+    IDENT:"IDENT", INT:"INT",
+    ASSIGN:"=", PLUS:"+", MINUS:"-", BANG:"!", ASTERISK:"*", SLASH:"/", PERCENT:"%",
+    LT:"<", GT:">", EQ:"==", NEQ:"!=",
+    COMMA:",", SEMICOLON:";", LPAREN:"(", RPAREN:")", LBRACE:"{", RBRACE:"}",
+    ILLEGAL:"ILLEGAL", EOF:"EOF"
+  };
+  var KW = {fn:TT.FN, let:TT.LET, "true":TT.TRUE, "false":TT.FALSE, "if":TT.IF, "else":TT.ELSE, "return":TT.RETURN};
+
+  function tokenize(input){
+    var toks = [], i = 0, n = input.length;
+    function isLetter(c){ return /[A-Za-z_]/.test(c); }
+    function isDigit(c){ return /[0-9]/.test(c); }
+    while (i < n){
+      var c = input[i];
+      if (c === ' ' || c === '\t' || c === '\n' || c === '\r'){ i++; continue; }
+      if (c === '='){
+        if (input[i+1] === '='){ toks.push({t:TT.EQ, l:'=='}); i+=2; } else { toks.push({t:TT.ASSIGN, l:'='}); i++; }
+        continue;
+      }
+      if (c === '!'){
+        if (input[i+1] === '='){ toks.push({t:TT.NEQ, l:'!='}); i+=2; } else { toks.push({t:TT.BANG, l:'!'}); i++; }
+        continue;
+      }
+      var single = {'+':TT.PLUS,'-':TT.MINUS,'*':TT.ASTERISK,'/':TT.SLASH,'%':TT.PERCENT,'<':TT.LT,'>':TT.GT,';':TT.SEMICOLON,',':TT.COMMA,'(':TT.LPAREN,')':TT.RPAREN,'{':TT.LBRACE,'}':TT.RBRACE};
+      if (single[c]){ toks.push({t:single[c], l:c}); i++; continue; }
+      if (isLetter(c)){
+        var start = i;
+        while (i < n && isLetter(input[i])) i++;
+        var word = input.slice(start, i);
+        toks.push({t: KW[word] || TT.IDENT, l: word});
+        continue;
+      }
+      if (isDigit(c)){
+        var s2 = i;
+        while (i < n && isDigit(input[i])) i++;
+        toks.push({t: TT.INT, l: input.slice(s2, i)});
+        continue;
+      }
+      toks.push({t: TT.ILLEGAL, l: c}); i++;
+    }
+    return toks;
+  }
+
+  var tkInput = document.getElementById('tk-input');
+  var tkOutput = document.getElementById('tk-output');
+  var KEYWORD_TYPES = new Set([TT.LET, TT.FN, TT.TRUE, TT.FALSE, TT.IF, TT.ELSE, TT.RETURN]);
+
+  function renderTokens(){
+    var toks = tokenize(tkInput.value);
+    tkOutput.innerHTML = '';
+    toks.forEach(function(tok){
+      var span = document.createElement('span');
+      span.className = 'tk-tok' + (KEYWORD_TYPES.has(tok.t) ? ' kw' : '');
+      span.innerHTML = '<span class="ty">' + tok.t + '</span><span>' + escapeHtml(tok.l) + '</span>';
+      tkOutput.appendChild(span);
+    });
+    if (toks.length === 0){
+      tkOutput.innerHTML = '<span style="color:var(--text-dimmer); font-family:var(--font-mono); font-size:12px;">(type something above)</span>';
+    }
+  }
+  if (tkInput){
+    tkInput.addEventListener('input', renderTokens);
+    renderTokens();
+  }
+})();
+</script>
+</body>
+</html>
